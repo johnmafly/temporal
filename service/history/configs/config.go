@@ -234,7 +234,6 @@ type Config struct {
 	ReplicationBypassCorruptedData                       dynamicconfig.BoolPropertyFnWithNamespaceIDFilter
 
 	ReplicationStreamSyncStatusDuration      dynamicconfig.DurationPropertyFn
-	ReplicationStreamMinReconnectDuration    dynamicconfig.DurationPropertyFn
 	ReplicationProcessorSchedulerQueueSize   dynamicconfig.IntPropertyFn
 	ReplicationProcessorSchedulerWorkerCount dynamicconfig.IntPropertyFn
 
@@ -409,7 +408,6 @@ func NewConfig(
 		ReplicationBypassCorruptedData:                        dc.GetBoolPropertyFnWithNamespaceIDFilter(dynamicconfig.ReplicationBypassCorruptedData, false),
 
 		ReplicationStreamSyncStatusDuration:      dc.GetDurationProperty(dynamicconfig.ReplicationStreamSyncStatusDuration, 1*time.Second),
-		ReplicationStreamMinReconnectDuration:    dc.GetDurationProperty(dynamicconfig.ReplicationStreamMinReconnectDuration, 4*time.Second),
 		ReplicationProcessorSchedulerQueueSize:   dc.GetIntProperty(dynamicconfig.ReplicationProcessorSchedulerQueueSize, 128),
 		ReplicationProcessorSchedulerWorkerCount: dc.GetIntProperty(dynamicconfig.ReplicationProcessorSchedulerWorkerCount, 512),
 
