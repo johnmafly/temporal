@@ -32,6 +32,7 @@ import (
 	"go.temporal.io/server/common/dynamicconfig"
 	"go.temporal.io/server/common/log"
 	"go.temporal.io/server/common/metrics"
+	"go.temporal.io/server/common/persistence"
 	"go.temporal.io/server/common/persistence/serialization"
 	"go.temporal.io/server/common/primitives"
 	"go.temporal.io/server/common/quotas"
@@ -47,6 +48,7 @@ type (
 		fx.In
 
 		DataStoreFactory           DataStoreFactory
+		EventBlobCache             persistence.XDCCache
 		Cfg                        *config.Persistence
 		PersistenceMaxQPS          PersistenceMaxQps
 		PersistenceNamespaceMaxQPS PersistenceNamespaceMaxQps
@@ -64,10 +66,15 @@ var Module = fx.Options(
 	BeanModule,
 	fx.Provide(ClusterNameProvider),
 	fx.Provide(DataStoreFactoryProvider),
+	fx.Provide(EventBlobCacheProvider),
 )
 
 func ClusterNameProvider(config *cluster.Config) ClusterName {
 	return ClusterName(config.CurrentClusterName)
+}
+
+func EventBlobCacheProvider() persistence.XDCCache {
+	return persistence.NewEventsBlobCache()
 }
 
 func FactoryProvider(
@@ -91,6 +98,7 @@ func FactoryProvider(
 		params.Cfg,
 		requestRatelimiter,
 		serialization.NewSerializer(),
+		params.EventBlobCache,
 		string(params.ClusterName),
 		params.MetricsHandler,
 		params.Logger,

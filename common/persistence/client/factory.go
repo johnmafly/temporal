@@ -65,6 +65,7 @@ type (
 		dataStoreFactory DataStoreFactory
 		config           *config.Persistence
 		serializer       serialization.Serializer
+		eventBlobCache   p.XDCCache
 		metricsHandler   metrics.Handler
 		logger           log.Logger
 		clusterName      string
@@ -84,6 +85,7 @@ func NewFactory(
 	cfg *config.Persistence,
 	ratelimiter quotas.RequestRateLimiter,
 	serializer serialization.Serializer,
+	eventBlobCache p.XDCCache,
 	clusterName string,
 	metricsHandler metrics.Handler,
 	logger log.Logger,
@@ -92,6 +94,7 @@ func NewFactory(
 		dataStoreFactory: dataStoreFactory,
 		config:           cfg,
 		serializer:       serializer,
+		eventBlobCache:   eventBlobCache,
 		metricsHandler:   metricsHandler,
 		logger:           logger,
 		clusterName:      clusterName,
@@ -177,7 +180,7 @@ func (f *factoryImpl) NewExecutionManager() (p.ExecutionManager, error) {
 		return nil, err
 	}
 
-	result := p.NewExecutionManager(store, f.serializer, f.logger, f.config.TransactionSizeLimit)
+	result := p.NewExecutionManager(store, f.serializer, f.eventBlobCache, f.logger, f.config.TransactionSizeLimit)
 	if f.ratelimiter != nil {
 		result = p.NewExecutionPersistenceRateLimitedClient(result, f.ratelimiter, f.logger)
 	}
