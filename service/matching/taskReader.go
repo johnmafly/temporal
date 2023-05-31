@@ -49,11 +49,12 @@ const (
 
 type (
 	taskReader struct {
-		status     int32
-		taskBuffer chan *persistencespb.AllocatedTaskInfo // tasks loaded from persistence
-		notifyC    chan struct{}                          // Used as signal to notify pump of new tasks
-		tlMgr      *taskQueueManagerImpl
-		gorogrp    goro.Group
+		status        int32
+		taskBuffer    chan *persistencespb.AllocatedTaskInfo // tasks loaded from persistence
+		notifyC       chan struct{}                          // Used as signal to notify pump of new tasks
+		tlMgr         *taskQueueManagerImpl
+		taskValidator taskValidator
+		gorogrp       goro.Group
 
 		backoffTimerLock sync.Mutex
 		backoffTimer     *time.Timer
@@ -63,9 +64,10 @@ type (
 
 func newTaskReader(tlMgr *taskQueueManagerImpl) *taskReader {
 	return &taskReader{
-		status:  common.DaemonStatusInitialized,
-		tlMgr:   tlMgr,
-		notifyC: make(chan struct{}, 1),
+		status:        common.DaemonStatusInitialized,
+		tlMgr:         tlMgr,
+		taskValidator: newTaskValidator(tlMgr.engine.historyClient),
+		notifyC:       make(chan struct{}, 1),
 		// we always dequeue the head of the buffer and try to dispatch it to a poller
 		// so allocate one less than desired target buffer size
 		taskBuffer: make(chan *persistencespb.AllocatedTaskInfo, tlMgr.config.GetTasksBatchSize()-1),
@@ -123,28 +125,28 @@ dispatchLoop:
 				break dispatchLoop
 			}
 			task := newInternalTask(taskInfo, tr.tlMgr.completeTask, enumsspb.TASK_SOURCE_DB_BACKLOG, "", false)
-			for {
-				// We checked if the task was expired before putting it in the buffer, but it
-				// might have expired while it sat in the buffer, so we should check again.
-				if taskqueue.IsTaskExpired(taskInfo) {
+			for ctx.Err() == nil {
+				if valid := tr.taskValidator.maybeValidate(taskInfo, tr.tlMgr.taskQueueID.taskType); !valid {
 					task.finish(nil)
 					tr.taggedMetricsHandler().Counter(metrics.ExpiredTasksPerTaskQueueCounter.GetMetricName()).Record(1)
 					// Don't try to set read level here because it may have been advanced already.
-					break
+					continue dispatchLoop
 				}
-				err := tr.tlMgr.DispatchTask(ctx, task)
+
+				taskCtx, cancel := context.WithTimeout(ctx, taskReaderOfferTimeout)
+				err := tr.tlMgr.DispatchTask(taskCtx, task)
+				cancel()
 				if err == nil {
-					break
+					continue dispatchLoop
 				}
-				if err == context.Canceled {
-					tr.tlMgr.logger.Info("Taskqueue manager context is cancelled, shutting down")
-					return err
-				}
-				// this should never happen unless there is a bug - don't drop the task
+
+				// if task is still valid (truly valid or unable to verify if task is valid)
 				tr.taggedMetricsHandler().Counter(metrics.BufferThrottlePerTaskQueueCounter.GetMetricName()).Record(1)
 				tr.logger().Error("taskReader: unexpected error dispatching task", tag.Error(err))
 				time.Sleep(taskReaderOfferThrottleWait)
 			}
+			tr.tlMgr.logger.Info("Taskqueue manager context is cancelled, shutting down")
+			return ctx.Err()
 
 		case <-ctx.Done():
 			return nil
