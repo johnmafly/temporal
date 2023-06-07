@@ -208,8 +208,10 @@ func (c *ControllerImpl) CloseShardByID(shardID int32) {
 		c.taggedMetricsHandler.Timer(metrics.RemoveEngineForShardLatency.GetMetricName()).Record(time.Since(startTime))
 	}()
 
-	// XXX(alfred): graceful handover
-	c.contextTaggedLogger.Warn("gracefulHandover: ControllerImpl::CloseShardByID", tag.ShardID(shardID))
+	if c.config.ShardLingerEnabled() {
+		// Should not see these if linger enabled.
+		c.contextTaggedLogger.Warn("gracefulHandover: ControllerImpl::CloseShardByID", tag.ShardID(shardID))
+	}
 
 	shard, newNumShards := c.removeShard(shardID, nil)
 	// Stop the current shard, if it exists.
