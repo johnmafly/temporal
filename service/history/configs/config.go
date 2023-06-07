@@ -80,6 +80,10 @@ type Config struct {
 	AcquireShardInterval    dynamicconfig.DurationPropertyFn
 	AcquireShardConcurrency dynamicconfig.IntPropertyFn
 
+	ShardLingerEnabled           dynamicconfig.BoolPropertyFn
+	ShardLingerOwnershipCheckQPS dynamicconfig.IntPropertyFn
+	ShardLingerTimeLimit         dynamicconfig.DurationPropertyFn
+
 	// the artificial delay added to standby cluster's view of active cluster's time
 	StandbyClusterDelay                  dynamicconfig.DurationPropertyFn
 	StandbyTaskMissingEventsResendDelay  dynamicconfig.DurationPropertyFnWithTaskTypeFilter
@@ -335,6 +339,9 @@ func NewConfig(dc *dynamicconfig.Collection, numberOfShards int32, isAdvancedVis
 		RangeSizeBits:                        20, // 20 bits for sequencer, 2^20 sequence number for any range
 		AcquireShardInterval:                 dc.GetDurationProperty(dynamicconfig.AcquireShardInterval, time.Minute),
 		AcquireShardConcurrency:              dc.GetIntProperty(dynamicconfig.AcquireShardConcurrency, 10),
+		ShardLingerEnabled:                   dc.GetBoolProperty(dynamicconfig.ShardLingerEnabled, false),
+		ShardLingerOwnershipCheckQPS:         dc.GetIntProperty(dynamicconfig.ShardLingerOwnershipCheckQPS, 4),
+		ShardLingerTimeLimit:                 dc.GetDurationProperty(dynamicconfig.ShardLingerTimeLimit, 5*time.Second),
 		StandbyClusterDelay:                  dc.GetDurationProperty(dynamicconfig.StandbyClusterDelay, 5*time.Minute),
 		StandbyTaskMissingEventsResendDelay:  dc.GetDurationPropertyFilteredByTaskType(dynamicconfig.StandbyTaskMissingEventsResendDelay, 10*time.Minute),
 		StandbyTaskMissingEventsDiscardDelay: dc.GetDurationPropertyFilteredByTaskType(dynamicconfig.StandbyTaskMissingEventsDiscardDelay, 15*time.Minute),

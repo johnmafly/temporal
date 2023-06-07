@@ -34,6 +34,7 @@ import (
 
 	"go.opentelemetry.io/otel/trace"
 	"go.temporal.io/api/serviceerror"
+	"golang.org/x/time/rate"
 
 	"go.temporal.io/server/api/historyservice/v1"
 	"go.temporal.io/server/client"
@@ -207,6 +208,9 @@ func (c *ControllerImpl) CloseShardByID(shardID int32) {
 		c.taggedMetricsHandler.Timer(metrics.RemoveEngineForShardLatency.GetMetricName()).Record(time.Since(startTime))
 	}()
 
+	// XXX(alfred): graceful handover
+	c.contextTaggedLogger.Warn("gracefulHandover: ControllerImpl::CloseShardByID", tag.ShardID(shardID))
+
 	shard, newNumShards := c.removeShard(shardID, nil)
 	// Stop the current shard, if it exists.
 	if shard != nil {
@@ -228,11 +232,13 @@ func (c *ControllerImpl) ShardIDs() []int32 {
 	return ids
 }
 
-func (c *ControllerImpl) shardClosedCallback(shard *ContextImpl) {
+func (c *ControllerImpl) shardRemoveAndStop(shard *ContextImpl) {
 	startTime := time.Now().UTC()
 	defer func() {
 		c.taggedMetricsHandler.Timer(metrics.RemoveEngineForShardLatency.GetMetricName()).Record(time.Since(startTime))
 	}()
+
+	c.contextTaggedLogger.Warn("gracefulHandover: ControllerImpl::shardRemoveAndStop")
 
 	c.taggedMetricsHandler.Counter(metrics.ShardContextClosedCounter.GetMetricName()).Record(1)
 	_, newNumShards := c.removeShard(shard.shardID, shard)
@@ -293,7 +299,7 @@ func (c *ControllerImpl) getOrCreateShardContext(shardID int32) (*ContextImpl, e
 		shardID,
 		c.engineFactory,
 		c.config,
-		c.shardClosedCallback,
+		c.shardRemoveAndStop,
 		c.logger,
 		c.throttledLogger,
 		c.persistenceExecutionManager,
@@ -374,6 +380,40 @@ func (c *ControllerImpl) shardManagementPump() {
 	}
 }
 
+func (c *ControllerImpl) shardLingerThenClose(shardID int32) {
+	c.contextTaggedLogger.Warn("gracefulHandover: ControllerImpl::acquireShards probing lost shard", tag.ShardID(shardID))
+	// XXX(alfred): graceful handover experiment: don't close
+	// the shard just because of a ringpop membership change.
+	c.RLock()
+	shard, ok := c.historyShards[shardID]
+	c.RUnlock()
+	if !ok || !shard.isValid() {
+		return
+	}
+
+	// Delay closing the shard for a small amount of time, and see if the
+	// shard becomes invalid due to a request to the shard receiving a
+	// shard ownership lost error.
+	timeout := util.Min(c.config.ShardLingerTimeLimit(), shardIOTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	qps := c.config.ShardLingerOwnershipCheckQPS()
+	limiter := rate.NewLimiter(rate.Limit(qps), qps)
+
+	for {
+		_ = shard.AssertOwnership(ctx)
+		if !shard.isValid() {
+			return
+		}
+
+		if err := limiter.Wait(ctx); err != nil {
+			c.shardRemoveAndStop(shard)
+			return
+		}
+	}
+}
+
 func (c *ControllerImpl) acquireShards() {
 	c.taggedMetricsHandler.Counter(metrics.AcquireShardsCounter.GetMetricName()).Record(1)
 	startTime := time.Now().UTC()
@@ -389,7 +429,11 @@ func (c *ControllerImpl) acquireShards() {
 		}
 		if info.Identity() != c.hostInfoProvider.HostInfo().Identity() {
 			// current host is not owner of shard, unload it if it is already loaded.
-			c.CloseShardByID(shardID)
+			if c.config.ShardLingerEnabled() {
+				c.shardLingerThenClose(shardID)
+			} else {
+				c.CloseShardByID(shardID)
+			}
 			return
 		}
 		shard, err := c.GetShardByID(shardID)
