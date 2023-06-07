@@ -500,16 +500,13 @@ LoopSubmit:
 
 func (c *ControllerImpl) doShutdown() {
 	c.contextTaggedLogger.Info("", tag.LifeCycleStopping)
-	// XXX(alfred): graceful handover experiment: don't close
-	// the shard just because of a ringpop membership change.
-	c.contextTaggedLogger.Warn("gracefulHandover: ControllerImpl::doShutdown not stopping any shards")
-
-	//c.Lock()
-	//defer c.Unlock()
-	//for _, shard := range c.historyShards {
-	//	shard.finishStop()
-	//}
-	//c.historyShards = nil
+	c.contextTaggedLogger.Warn("gracefulHandover: ControllerImpl::doShutdown stopping shards")
+	c.Lock()
+	defer c.Unlock()
+	for _, shard := range c.historyShards {
+		shard.finishStop()
+	}
+	c.historyShards = nil
 }
 
 func (c *ControllerImpl) validateShardId(shardID int32) error {
