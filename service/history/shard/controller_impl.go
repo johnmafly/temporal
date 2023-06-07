@@ -381,15 +381,26 @@ func (c *ControllerImpl) shardManagementPump() {
 }
 
 func (c *ControllerImpl) shardLingerThenClose(shardID int32) {
-	c.contextTaggedLogger.Warn("gracefulHandover: ControllerImpl::acquireShards probing lost shard", tag.ShardID(shardID))
 	// XXX(alfred): graceful handover experiment: don't close
 	// the shard just because of a ringpop membership change.
 	c.RLock()
 	shard, ok := c.historyShards[shardID]
 	c.RUnlock()
-	if !ok || !shard.isValid() {
+	if !ok {
 		return
 	}
+
+	c.contextTaggedLogger.Warn("gracefulHandover: ControllerImpl::shardLingerThenClose has shard", tag.ShardID(shardID))
+	defer func() {
+		c.contextTaggedLogger.Warn("gracefulHandover: ControllerImpl::shardLingerThenClose exiting", tag.ShardID(shardID))
+	}()
+
+	if !shard.isValid() {
+		c.contextTaggedLogger.Warn("gracefulHandover: ControllerImpl::shardLingerThenClose immediate invalid", tag.ShardID(shardID))
+		return
+	}
+
+	c.contextTaggedLogger.Warn("gracefulHandover: ControllerImpl::shardLingerThenClose beginning loop", tag.ShardID(shardID))
 
 	// Delay closing the shard for a small amount of time, and see if the
 	// shard becomes invalid due to a request to the shard receiving a
@@ -408,6 +419,7 @@ func (c *ControllerImpl) shardLingerThenClose(shardID int32) {
 		}
 
 		if err := limiter.Wait(ctx); err != nil {
+			c.contextTaggedLogger.Warn("gracefulHandover: ControllerImpl::shardLingerThenClose out of time", tag.ShardID(shardID))
 			c.shardRemoveAndStop(shard)
 			return
 		}
