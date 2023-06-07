@@ -134,7 +134,6 @@ func (s *Service) Stop() {
 	// 6. wait for grace period
 	// 7. force stop the whole world and return
 
-	const gossipPropagationDelay = 400 * time.Millisecond
 	const shardOwnershipTransferDelay = 5 * time.Second
 	const gracePeriod = 2 * time.Second
 
@@ -142,19 +141,18 @@ func (s *Service) Stop() {
 
 	logger.Info("ShutdownHandler: Evicting self from membership ring")
 	_ = s.membershipMonitor.EvictSelf()
-	s.healthServer.SetServingStatus(serviceName, healthpb.HealthCheckResponse_NOT_SERVING)
 
-	logger.Info("ShutdownHandler: Waiting for others to discover I am unhealthy")
-	remainingTime = s.sleep(gossipPropagationDelay, remainingTime)
+	logger.Info("ShutdownHandler: Waiting for shard ownership transfer")
+	remainingTime = s.sleep(shardOwnershipTransferDelay, remainingTime)
 
 	logger.Info("ShutdownHandler: Initiating shardController shutdown")
 	s.handler.controller.Stop()
-	logger.Info("ShutdownHandler: Waiting for traffic to drain")
-	remainingTime = s.sleep(shardOwnershipTransferDelay, remainingTime)
 
-	logger.Info("ShutdownHandler: No longer taking rpc requests")
+	s.healthServer.SetServingStatus(serviceName, healthpb.HealthCheckResponse_NOT_SERVING)
+	logger.Info("ShutdownHandler: Waiting for others to discover I am unhealthy")
 	_ = s.sleep(gracePeriod, remainingTime)
 
+	logger.Info("ShutdownHandler: No longer taking rpc requests")
 	// TODO: Change this to GracefulStop when integration tests are refactored.
 	s.server.Stop()
 
