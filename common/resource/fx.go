@@ -357,7 +357,12 @@ func RegisterBootstrapContainer(
 	)
 }
 
-func HistoryClientProvider(clientBean client.Bean) historyservice.HistoryServiceClient {
+func HistoryClientProvider(
+	logger log.SnTaggedLogger,
+	clientBean client.Bean,
+) historyservice.HistoryServiceClient {
+	logger.Warn("gracefulHandover: OSS HistoryClientProvider called!!")
+
 	historyRawClient := clientBean.GetHistoryClient()
 	historyClient := history.NewRetryableClient(
 		historyRawClient,

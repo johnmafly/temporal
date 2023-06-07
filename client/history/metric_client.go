@@ -61,6 +61,11 @@ func NewMetricClient(
 	}
 }
 
+type fakeMetricsHandler struct {
+	metrics.Handler
+	operation string
+}
+
 func (c *metricClient) startMetricsRecording(
 	ctx context.Context,
 	operation string,
@@ -68,7 +73,10 @@ func (c *metricClient) startMetricsRecording(
 	caller := headers.GetCallerInfo(ctx).CallerName
 	metricsHandler := c.metricsHandler.WithTags(metrics.OperationTag(operation), metrics.NamespaceTag(caller), metrics.ServiceRoleTag(metrics.HistoryRoleTagValue))
 	metricsHandler.Counter(metrics.ClientRequests.GetMetricName()).Record(1)
-	return metricsHandler, time.Now().UTC()
+	return &fakeMetricsHandler{
+		Handler:   metricsHandler,
+		operation: operation,
+	}, time.Now().UTC()
 }
 
 func (c *metricClient) finishMetricsRecording(
@@ -90,6 +98,11 @@ func (c *metricClient) finishMetricsRecording(
 			c.throttledLogger.Info("history client encountered error", tag.Error(err), tag.ErrorType(err))
 		}
 		metricsHandler.Counter(metrics.ClientFailures.GetMetricName()).Record(1, metrics.ServiceErrorTypeTag(err))
+	}
+	dur := time.Since(startTime)
+	if dur > 500*time.Millisecond {
+		fmh := metricsHandler.(*fakeMetricsHandler)
+		c.logger.Warn("shardPlacementMap: history client slow operation", tag.Operation(fmh.operation), tag.NewDurationTag("duration", dur), tag.Error(err), tag.ErrorType(err))
 	}
 	metricsHandler.Timer(metrics.ClientLatency.GetMetricName()).Record(time.Since(startTime))
 }
