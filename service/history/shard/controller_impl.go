@@ -78,6 +78,7 @@ type (
 
 		sync.RWMutex
 		historyShards               map[int32]*ContextImpl
+		shardLastRemove             map[int32]time.Time
 		logger                      log.Logger
 		persistenceExecutionManager persistence.ExecutionManager
 		persistenceShardManager     persistence.ShardManager
@@ -293,6 +294,20 @@ func (c *ControllerImpl) getOrCreateShardContext(shardID int32) (*ContextImpl, e
 		delete(c.historyShards, shardID)
 	}
 
+	if lastRemove, ok := c.shardLastRemove[shardID]; ok {
+		// It can happen that we receive a shard ownership lost error before
+		// our membership client reports that we no longer own the shard.
+		delta := time.Now().Sub(lastRemove)
+		if delta < c.config.ShardReacquireMinDuration() {
+			c.contextTaggedLogger.Error("gracefulHandover: shard acquire before ShardReacquireMinDuration",
+				tag.ShardID(shardID),
+				tag.NewDurationTag("delta", delta),
+				tag.NewTimeTag("lastRemove", lastRemove),
+			)
+			return nil, serviceerrors.NewShardOwnershipLost("", hostInfo.GetAddress())
+		}
+	}
+
 	if atomic.LoadInt32(&c.status) == common.DaemonStatusStopped {
 		return nil, fmt.Errorf("ControllerImpl for host '%v' shutting down", hostInfo.Identity())
 	}
@@ -323,6 +338,7 @@ func (c *ControllerImpl) getOrCreateShardContext(shardID int32) (*ContextImpl, e
 	}
 	shard.start()
 	c.historyShards[shardID] = shard
+	delete(c.shardLastRemove, shardID)
 	c.taggedMetricsHandler.Counter(metrics.ShardContextCreatedCounter.GetMetricName()).Record(1)
 
 	shard.contextTaggedLogger.Info("", tag.LifeCycleStarted, tag.ComponentShardContext)
@@ -345,6 +361,7 @@ func (c *ControllerImpl) removeShard(shardID int32, expected *ContextImpl) (*Con
 	}
 
 	delete(c.historyShards, shardID)
+	c.shardLastRemove[shardID] = time.Now().UTC()
 
 	return current, nShards - 1
 }

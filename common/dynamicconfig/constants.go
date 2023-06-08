@@ -377,6 +377,8 @@ const (
 	ShardLingerOwnershipCheckQPS = "history.shardLingerOwnershipCheckQPS"
 	// ShardLingerTimeLimit is the upper bound on how long a shard can linger.
 	ShardLingerTimeLimit = "history.shardLingerTimeLimit"
+	// ShardReacquireMinDuration is the minimum duration between re-acquisitions of the same shard
+	ShardReacquireMinDuration = "history.shardReacquireMinDuration"
 	// StandbyClusterDelay is the artificial delay added to standby cluster's view of active cluster's time
 	StandbyClusterDelay = "history.standbyClusterDelay"
 	// StandbyTaskMissingEventsResendDelay is the amount of time standby cluster's will wait (if events are missing)

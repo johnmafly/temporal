@@ -25,6 +25,8 @@
 package shard
 
 import (
+	"time"
+
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/fx"
 
@@ -78,6 +80,7 @@ func ControllerProvider(
 		status:                      common.DaemonStatusInitialized,
 		membershipUpdateCh:          make(chan *membership.ChangedEvent, 10),
 		historyShards:               make(map[int32]*ContextImpl),
+		shardLastRemove:             make(map[int32]time.Time),
 		shutdownCh:                  make(chan struct{}),
 		logger:                      logger,
 		contextTaggedLogger:         logger,          // will add tags in Start
