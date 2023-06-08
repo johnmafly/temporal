@@ -44,6 +44,13 @@ type metricClient struct {
 	metricsHandler  metrics.Handler
 	logger          log.Logger
 	throttledLogger log.Logger
+	metricNames     MetricNames
+}
+
+type MetricNames struct {
+	ClientRequests string
+	ClientFailures string
+	ClientLatency  string
 }
 
 // NewMetricClient creates a new instance of historyservice.HistoryServiceClient that emits metrics
@@ -52,12 +59,14 @@ func NewMetricClient(
 	metricsHandler metrics.Handler,
 	logger log.Logger,
 	throttledLogger log.Logger,
+	metricNames MetricNames,
 ) historyservice.HistoryServiceClient {
 	return &metricClient{
 		client:          client,
 		metricsHandler:  metricsHandler,
 		logger:          logger,
 		throttledLogger: throttledLogger,
+		metricNames:     metricNames,
 	}
 }
 
@@ -66,13 +75,21 @@ type fakeMetricsHandler struct {
 	operation string
 }
 
+func ClientStandardMetricNames() MetricNames {
+	return MetricNames{
+		ClientRequests: metrics.ClientRequests.GetMetricName(),
+		ClientFailures: metrics.ClientFailures.GetMetricName(),
+		ClientLatency:  metrics.ClientLatency.GetMetricName(),
+	}
+}
+
 func (c *metricClient) startMetricsRecording(
 	ctx context.Context,
 	operation string,
 ) (metrics.Handler, time.Time) {
 	caller := headers.GetCallerInfo(ctx).CallerName
 	metricsHandler := c.metricsHandler.WithTags(metrics.OperationTag(operation), metrics.NamespaceTag(caller), metrics.ServiceRoleTag(metrics.HistoryRoleTagValue))
-	metricsHandler.Counter(metrics.ClientRequests.GetMetricName()).Record(1)
+	metricsHandler.Counter(c.metricNames.ClientRequests).Record(1)
 	return &fakeMetricsHandler{
 		Handler:   metricsHandler,
 		operation: operation,
@@ -97,12 +114,12 @@ func (c *metricClient) finishMetricsRecording(
 		default:
 			c.throttledLogger.Info("history client encountered error", tag.Error(err), tag.ErrorType(err))
 		}
-		metricsHandler.Counter(metrics.ClientFailures.GetMetricName()).Record(1, metrics.ServiceErrorTypeTag(err))
+		metricsHandler.Counter(c.metricNames.ClientFailures).Record(1, metrics.ServiceErrorTypeTag(err))
 	}
 	dur := time.Since(startTime)
 	if dur > 500*time.Millisecond {
 		fmh := metricsHandler.(*fakeMetricsHandler)
 		c.logger.Warn("shardPlacementMap: history client slow operation", tag.Operation(fmh.operation), tag.NewDurationTag("duration", dur), tag.Error(err), tag.ErrorType(err))
 	}
-	metricsHandler.Timer(metrics.ClientLatency.GetMetricName()).Record(time.Since(startTime))
+	metricsHandler.Timer(c.metricNames.ClientLatency).Record(time.Since(startTime))
 }
