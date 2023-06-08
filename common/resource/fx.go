@@ -305,14 +305,25 @@ func RegisterBootstrapContainer(
 	)
 }
 
-func HistoryClientProvider(clientBean client.Bean) historyservice.HistoryServiceClient {
+func HistoryClientProvider(
+	logger log.SnTaggedLogger,
+	clientBean client.Bean,
+	metricsHandler metrics.Handler,
+) historyservice.HistoryServiceClient {
 	historyRawClient := clientBean.GetHistoryClient()
 	historyClient := history.NewRetryableClient(
 		historyRawClient,
 		common.CreateHistoryClientRetryPolicy(),
 		common.IsServiceClientTransientError,
 	)
-	return historyClient
+
+	metricNames := history.MetricNames{
+		ClientRequests: "retry_client_requests",
+		ClientFailures: "retry_client_errors",
+		ClientLatency:  "retry_client_latency",
+	}
+
+	return history.NewMetricClient(historyClient, metricsHandler, logger, logger, metricNames)
 }
 
 func MatchingRawClientProvider(clientBean client.Bean, namespaceRegistry namespace.Registry) (

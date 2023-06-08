@@ -133,7 +133,7 @@ func (cf *rpcClientFactory) NewHistoryClientWithTimeout(timeout time.Duration) (
 	clientCache := common.NewClientCache(keyResolver, clientProvider)
 	client := history.NewClient(cf.numberOfHistoryShards, timeout, clientCache, cf.logger)
 	if cf.metricsHandler != nil {
-		client = history.NewMetricClient(client, cf.metricsHandler, cf.logger, cf.throttledLogger)
+		client = history.NewMetricClient(client, cf.metricsHandler, cf.logger, cf.throttledLogger, history.ClientStandardMetricNames())
 	}
 	return client, nil
 }
