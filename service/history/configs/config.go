@@ -63,6 +63,8 @@ type Config struct {
 	EnableStickyQuery     dynamicconfig.BoolPropertyFnWithNamespaceFilter
 	ShutdownDrainDuration dynamicconfig.DurationPropertyFn
 
+	ShutdownPreEvictSleepDuration dynamicconfig.DurationPropertyFn
+
 	// HistoryCache settings
 	// Change of these configs require shard restart
 	HistoryCacheInitialSize dynamicconfig.IntPropertyFn
@@ -316,6 +318,7 @@ func NewConfig(dc *dynamicconfig.Collection, numberOfShards int32, isAdvancedVis
 		PersistenceNamespaceMaxQPS:            dc.GetIntPropertyFilteredByNamespace(dynamicconfig.HistoryPersistenceNamespaceMaxQPS, 0),
 		EnablePersistencePriorityRateLimiting: dc.GetBoolProperty(dynamicconfig.HistoryEnablePersistencePriorityRateLimiting, true),
 		ShutdownDrainDuration:                 dc.GetDurationProperty(dynamicconfig.HistoryShutdownDrainDuration, 0*time.Second),
+		ShutdownPreEvictSleepDuration:         dc.GetDurationProperty(dynamicconfig.HistoryShutdownPreEvictSleepDuration, 0*time.Second),
 		MaxAutoResetPoints:                    dc.GetIntPropertyFilteredByNamespace(dynamicconfig.HistoryMaxAutoResetPoints, DefaultHistoryMaxAutoResetPoints),
 		DefaultWorkflowTaskTimeout:            dc.GetDurationPropertyFilteredByNamespace(dynamicconfig.DefaultWorkflowTaskTimeout, common.DefaultWorkflowTaskTimeout),
 		ContinueAsNewMinInterval:              dc.GetDurationPropertyFilteredByNamespace(dynamicconfig.ContinueAsNewMinInterval, time.Second),

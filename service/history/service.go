@@ -184,8 +184,14 @@ func (s *Service) GetFaultInjection() *client.FaultInjectionDataStoreFactory {
 
 func (s *Service) lingerStop() {
 	logger := s.logger
-	const shardOwnershipTransferDelay = 5 * time.Second
+	const shardOwnershipTransferDelay = 20 * time.Second
 	const gracePeriod = 2 * time.Second
+
+	if preEvictSleepDuration := s.config.ShutdownPreEvictSleepDuration(); preEvictSleepDuration > 0 {
+		logger.Info("gracefulHandover: ShutdownHandler: sleeping before evict",
+			tag.NewDurationTag("preEvictSleepDuration", preEvictSleepDuration))
+		time.Sleep(preEvictSleepDuration)
+	}
 
 	remainingTime := s.config.ShutdownDrainDuration()
 

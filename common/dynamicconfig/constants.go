@@ -359,6 +359,8 @@ const (
 	HistoryCacheTTL = "history.cacheTTL"
 	// HistoryShutdownDrainDuration is the duration of traffic drain during shutdown
 	HistoryShutdownDrainDuration = "history.shutdownDrainDuration"
+	//
+	HistoryShutdownPreEvictSleepDuration = "history.shutdownPreEvictSleepDuration"
 	// EventsCacheInitialSize is initial size of events cache
 	EventsCacheInitialSize = "history.eventsCacheInitialSize"
 	// EventsCacheMaxSize is max size of events cache
