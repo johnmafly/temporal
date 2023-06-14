@@ -1490,6 +1490,11 @@ var (
 	ClosedWorkflowBufferEventCount                 = NewCounterDef("closed_workflow_buffer_event_counter")
 	InorderBufferedEventsCounter                   = NewCounterDef("inordered_buffered_events")
 
+	ReplicationActivityTasksPush    = NewCounterDef("replication_activity_tasks_push")
+	ReplicationWorkflowTasksPush    = NewCounterDef("replication_workflow_tasks_push")
+	ReplicationActivityTasksDiscard = NewCounterDef("replication_activity_tasks_discard")
+	ReplicationWorkflowTasksDiscard = NewCounterDef("replication_workflow_tasks_discard")
+
 	// Matching
 	MatchingClientForwardedCounter            = NewCounterDef("forwarded")
 	MatchingClientInvalidTaskQueueName        = NewCounterDef("invalid_task_queue_name")

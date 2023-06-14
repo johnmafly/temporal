@@ -66,7 +66,7 @@ func newTaskReader(tlMgr *taskQueueManagerImpl) *taskReader {
 	return &taskReader{
 		status:        common.DaemonStatusInitialized,
 		tlMgr:         tlMgr,
-		taskValidator: newTaskValidator(tlMgr.engine.historyClient),
+		taskValidator: newTaskValidator(tlMgr.engine.historyClient, tlMgr.metricsHandler),
 		notifyC:       make(chan struct{}, 1),
 		// we always dequeue the head of the buffer and try to dispatch it to a poller
 		// so allocate one less than desired target buffer size
