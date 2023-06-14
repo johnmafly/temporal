@@ -220,7 +220,16 @@ func (r *WorkflowImpl) FlushBufferedEvents() error {
 		return serviceerror.NewInternal("Workflow encountered workflow with buffered events but last write not from current cluster")
 	}
 
-	return r.failWorkflowTask(lastWriteVersion)
+	if err = r.failWorkflowTask(lastWriteVersion); err != nil {
+		return err
+	}
+	if _, err := r.mutableState.AddWorkflowTaskScheduledEvent(
+		false,
+		enumsspb.WORKFLOW_TASK_TYPE_NORMAL,
+	); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (r *WorkflowImpl) failWorkflowTask(
