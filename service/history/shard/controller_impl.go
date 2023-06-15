@@ -127,6 +127,8 @@ func (c *ControllerImpl) Start() {
 		c.membershipUpdateCh,
 	); err != nil {
 		c.contextTaggedLogger.Error("Error adding listener", tag.Error(err))
+		// XXX(alfred) gracefulHandover
+		c.contextTaggedLogger.Fatal("gracefulHandover: shard controller Error adding listener", tag.Error(err))
 	}
 
 	c.contextTaggedLogger.Info("", tag.LifeCycleStarted)

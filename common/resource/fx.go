@@ -283,10 +283,13 @@ func MembershipMonitorProvider(
 
 	lc.Append(
 		fx.Hook{
-			OnStart: func(context.Context) error {
-				monitor.Start()
-				return nil
-			},
+			// XXX(alfred): gracefulHandover
+			// commenting this out to try to not join ringpop until
+			// after main service listener is ready
+			//OnStart: func(context.Context) error {
+			//	monitor.Start()
+			//	return nil
+			//},
 			OnStop: func(context.Context) error {
 				monitor.Stop()
 				factory.CloseTChannel()

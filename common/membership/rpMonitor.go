@@ -342,14 +342,21 @@ func (rpo *ringpopMonitor) Stop() {
 // For this reason we need to lookup the port for the service and replace ringpop port with service port before
 // returning HostInfo back.
 func (rpo *ringpopMonitor) WhoAmI() (*HostInfo, error) {
-	address, err := rpo.rp.WhoAmI()
+	// XXX(alfred) gracefulHandover
+	// Allow calls to WhoAmI before ringpop has started.
+	address, err := rpo.broadcastHostPortResolver()
 	if err != nil {
 		return nil, err
 	}
-	labels, err := rpo.rp.Labels()
-	if err != nil {
-		return nil, err
-	}
+
+	//address, err := rpo.rp.WhoAmI()
+	//if err != nil {
+	//	return nil, err
+	//}
+	//labels, err := rpo.rp.Labels()
+	//if err != nil {
+	//	return nil, err
+	//}
 
 	servicePort, ok := rpo.services[rpo.serviceName]
 	if !ok {
@@ -360,7 +367,12 @@ func (rpo *ringpopMonitor) WhoAmI() (*HostInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewHostInfo(serviceAddress, labels.AsMap()), nil
+
+	// XXX(alfred) gracefulHandover
+	// to Allow calls to WhoAmI before ringpop has started,
+	// not yet returning any labels. They dont appear to be used.
+	//return NewHostInfo(serviceAddress, labels.AsMap()), nil
+	return NewHostInfo(serviceAddress, nil), nil
 }
 
 func (rpo *ringpopMonitor) EvictSelf() error {

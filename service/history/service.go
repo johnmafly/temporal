@@ -110,10 +110,20 @@ func (s *Service) Start() {
 	s.healthServer.SetServingStatus(serviceName, healthpb.HealthCheckResponse_SERVING)
 
 	listener := s.grpcListener
-	logger.Info("Starting to serve on history listener")
-	if err := s.server.Serve(listener); err != nil {
-		logger.Fatal("Failed to serve on history listener", tag.Error(err))
-	}
+	go func() {
+		logger.Info("Starting to serve on history listener")
+		if err := s.server.Serve(listener); err != nil {
+			logger.Fatal("Failed to serve on history listener", tag.Error(err))
+		}
+	}()
+
+	preMembershipSleep := 30 * time.Second
+	logger.Info("history start: gracefulHandover: sleeping before membership start",
+		tag.NewDurationTag("preMembershipSleep", preMembershipSleep))
+	time.Sleep(preMembershipSleep)
+	logger.Info("history start: starting membershipMonitor")
+	s.membershipMonitor.Start()
+	logger.Info("history start: membershipMonitor start completed")
 }
 
 // Stop stops the service
