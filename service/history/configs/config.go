@@ -81,6 +81,9 @@ type Config struct {
 	AcquireShardInterval                   dynamicconfig.DurationPropertyFn
 	AcquireShardConcurrency                dynamicconfig.IntPropertyFn
 	ShardOwnershipLostReacquireMinDuration dynamicconfig.DurationPropertyFn
+	ShardLingerEnabled                     dynamicconfig.BoolPropertyFn
+	ShardLingerOwnershipCheckQPS           dynamicconfig.IntPropertyFn
+	ShardLingerTimeLimit                   dynamicconfig.DurationPropertyFn
 
 	// the artificial delay added to standby cluster's view of active cluster's time
 	StandbyClusterDelay                  dynamicconfig.DurationPropertyFn
@@ -359,6 +362,9 @@ func NewConfig(
 		AcquireShardInterval:                   dc.GetDurationProperty(dynamicconfig.AcquireShardInterval, time.Minute),
 		AcquireShardConcurrency:                dc.GetIntProperty(dynamicconfig.AcquireShardConcurrency, 10),
 		ShardOwnershipLostReacquireMinDuration: dc.GetDurationProperty(dynamicconfig.ShardOwnershipLostReacquireMinDuration, 0),
+		ShardLingerEnabled:                     dc.GetBoolProperty(dynamicconfig.ShardLingerEnabled, false),
+		ShardLingerOwnershipCheckQPS:           dc.GetIntProperty(dynamicconfig.ShardLingerOwnershipCheckQPS, 4),
+		ShardLingerTimeLimit:                   dc.GetDurationProperty(dynamicconfig.ShardLingerTimeLimit, 5*time.Second),
 
 		StandbyClusterDelay:                  dc.GetDurationProperty(dynamicconfig.StandbyClusterDelay, 5*time.Minute),
 		StandbyTaskMissingEventsResendDelay:  dc.GetDurationPropertyFilteredByTaskType(dynamicconfig.StandbyTaskMissingEventsResendDelay, 10*time.Minute),

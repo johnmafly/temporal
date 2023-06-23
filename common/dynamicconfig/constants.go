@@ -498,6 +498,14 @@ const (
 	// ShardOwnershipLostReacquireMinDuration is the minimum duration allowed between receiving
 	// a shard ownership lost error for a shard and allowing attempts to reacquire it.
 	ShardOwnershipLostReacquireMinDuration = "history.shardOwnershipLostReacquireMinDuration"
+	// ShardLingerEnabled is control whether to immediately close a shard when
+	// membership reports that the history server should no longer own it.
+	ShardLingerEnabled = "history.shardLingerEnabled"
+	// ShardLingerOwnershipCheckQPS is the frequency to perform shard ownership
+	// checks while a shard is lingering.
+	ShardLingerOwnershipCheckQPS = "history.shardLingerOwnershipCheckQPS"
+	// ShardLingerTimeLimit is the upper bound on how long a shard can linger.
+	ShardLingerTimeLimit = "history.shardLingerTimeLimit"
 	// StandbyClusterDelay is the artificial delay added to standby cluster's view of active cluster's time
 	StandbyClusterDelay = "history.standbyClusterDelay"
 	// StandbyTaskMissingEventsResendDelay is the amount of time standby cluster's will wait (if events are missing)
