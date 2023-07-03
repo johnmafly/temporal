@@ -1654,11 +1654,19 @@ var (
 	ScheduleActionErrors                                      = NewCounterDef("schedule_action_errors")
 	ScheduleCancelWorkflowErrors                              = NewCounterDef("schedule_cancel_workflow_errors")
 	ScheduleTerminateWorkflowErrors                           = NewCounterDef("schedule_terminate_workflow_errors")
+	ForceReplicationVerifySingleTaskSuccess                   = NewCounterDef("force_replication_verify_single_task_success")
+	ForceReplicationVerifyTaskNotFound                        = NewCounterDef("force_replication_verify_task_not_found")
+	ForceReplicationVerifyTasksSuccess                        = NewCounterDef("force_replication_verify_tasks_success")
+	ForceReplicationVerifyTasksFailures                       = NewCounterDef("force_replication_verify_tasks_failures")
+	ForceReplicationVerifyTasksAttempts                       = NewCounterDef("force_replication_verify_tasks_attempts")
+	ForceReplicationZombieWorkflowEncountered                 = NewCounterDef("force_replication_zombie_workflow_encountered")
 
 	// Replication
 	NamespaceReplicationTaskAckLevelGauge = NewGaugeDef("namespace_replication_task_ack_level")
 	NamespaceReplicationDLQAckLevelGauge  = NewGaugeDef("namespace_dlq_ack_level")
 	NamespaceReplicationDLQMaxLevelGauge  = NewGaugeDef("namespace_dlq_max_level")
+	GenerateHistoryReplicationTasksCount  = NewCounterDef("generate_history_replication_tasks_count")
+	GenerateHistoryReplicationTasksError  = NewCounterDef("generate_history_replication_tasks_error")
 
 	// Persistence
 	PersistenceRequests                                 = NewCounterDef("persistence_requests")
