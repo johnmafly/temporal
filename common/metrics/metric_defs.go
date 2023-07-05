@@ -420,6 +420,10 @@ const (
 	HistoryClientGetDLQReplicationMessagesScope = "HistoryClientGetDLQReplicationMessages"
 	// HistoryClientGetShardScope tracks RPC calls to history service
 	HistoryClientGetShardScope = "HistoryClientGetShard"
+	// HistoryClientIsActivityTaskValidScope tracks RPC calls to history service
+	HistoryClientIsActivityTaskValidScope = "HistoryClientIsActivityTaskValid"
+	// HistoryClientIsWorkflowTaskValidScope tracks RPC calls to history service
+	HistoryClientIsWorkflowTaskValidScope = "HistoryClientIsWorkflowTaskValidS"
 	// HistoryClientRebuildMutableStateScope tracks RPC calls to history service
 	HistoryClientRebuildMutableStateScope = "HistoryClientRebuildMutableState"
 	// HistoryClientRemoveTaskScope tracks RPC calls to history service
@@ -1522,7 +1526,7 @@ var (
 	RespondQueryTaskFailedPerTaskQueueCounter = NewCounterDef("respond_query_failed")
 	SyncThrottlePerTaskQueueCounter           = NewCounterDef("sync_throttle_count")
 	BufferThrottlePerTaskQueueCounter         = NewCounterDef("buffer_throttle_count")
-	ExpiredTasksPerTaskQueueCounter           = NewCounterDef("tasks_expired")
+	InvalidTasksPerTaskQueueCounter           = NewCounterDef("tasks_invalid")
 	ForwardedPerTaskQueueCounter              = NewCounterDef("forwarded_per_tl")
 	ForwardTaskCallsPerTaskQueue              = NewCounterDef("forward_task_calls")
 	ForwardTaskErrorsPerTaskQueue             = NewCounterDef("forward_task_errors")
