@@ -49,7 +49,7 @@ services:
   integration-test-cassandra:
     build:
       context: ../..
-      dockerfile: ./develop/buildkite/Dockerfile
+      dockerfile: ../docker-compose/Dockerfile
     environment:
       - "CASSANDRA_SEEDS=cassandra"
       - "ES_SEEDS=elasticsearch"
@@ -57,16 +57,11 @@ services:
       - "PERSISTENCE_TYPE=nosql"
       - "PERSISTENCE_DRIVER=cassandra"
       - "TEMPORAL_VERSION_CHECK_DISABLED=1"
-      - BUILDKITE_AGENT_ACCESS_TOKEN
-      - BUILDKITE_JOB_ID
-      - BUILDKITE_BUILD_ID
-      - BUILDKITE_BUILD_NUMBER
     depends_on:
       - cassandra
       - elasticsearch
     volumes:
       - ../..:/temporal
-      - /usr/bin/buildkite-agent:/usr/bin/buildkite-agent
     networks:
       services-network:
         aliases:

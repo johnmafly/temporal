@@ -1,0 +1,421 @@
+name: Build and Test
+on:
+  push:
+permissions:
+  contents: read
+  checks: write
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Build docker-compose Image
+        run: |
+          docker-compose -f ./develop/buildkite/docker-compose.yml run --entrypoint '/bin/sh -c "git config --global --add safe.directory /temporal && make ci-build"' build
+  unit_test:
+    name: Unit Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Run Unit Tests
+        run: |
+          docker-compose -f ./develop/buildkite/docker-compose.yml run --entrypoint '/bin/sh -c "git config --global --add safe.directory /temporal && make unit-test-coverage"' build
+      - name: Coveralls
+        uses: coverallsapp/github-action@master
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          flag-name: ${{ github.job }}
+          parallel: true
+          file: .coverage/*.out
+  integration_test:
+    name: Integration Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Run Integration Tests
+        run: |
+          docker-compose -f ./develop/buildkite/docker-compose.yml run --entrypoint '/bin/sh -c "git config --global --add safe.directory /temporal && make integration-test-coverage"' db-integration-test
+      - name: Coveralls
+        uses: coverallsapp/github-action@master
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          flag-name: ${{ github.job }}
+          parallel: true
+          file: .coverage/*.out
+  functional_test_cassandra:
+    name: Functional Test with Cassandra
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Run Functional Tests with Cassandra
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 2
+          command: |
+            docker-compose -f ./develop/buildkite/docker-compose.yml run --entrypoint '/bin/sh -c "git config --global --add safe.directory /temporal && make functional-test-coverage"' integration-test-cassandra
+      - name: Coveralls
+        uses: coverallsapp/github-action@master
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          flag-name: ${{ github.job }}
+          parallel: true
+          file: .coverage/*.out
+#  functional_test_cassandra_es8:
+#    name: Functional Test with Cassandra and Elasticsearch 8
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Checkout
+#        uses: actions/checkout@v2
+#      - name: Run Functional Tests with Cassandra and Elasticsearch 8
+#        uses: nick-fields/retry@v2
+#        with:
+#          timeout_minutes: 30
+#          max_attempts: 2
+#          command: |
+#            docker-compose -f ./develop/buildkite/docker-compose-es8.yml run --entrypoint '/bin/sh -c "git config --global --add safe.directory /temporal && make functional-test-coverage"' integration-test-cassandra
+#      - name: Coveralls
+#        uses: coverallsapp/github-action@master
+#        with:
+#          github-token: ${{ secrets.GITHUB_TOKEN }}
+#          flag-name: ${{ github.job }}
+#          parallel: true
+#          file: .coverage/*.out
+#  functional_xdc_test_cassandra:
+#    name: Functional XDC Test with Cassandra
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Checkout
+#        uses: actions/checkout@v2
+#      - name: Run Functional XDC Tests with Cassandra
+#        uses: nick-fields/retry@v2
+#        with:
+#          timeout_minutes: 30
+#          max_attempts: 2
+#          command: |
+#            docker-compose -f ./develop/buildkite/docker-compose.yml run --entrypoint '/bin/sh -c "git config --global --add safe.directory /temporal && make functional-test-xdc-coverage"'  integration-test-xdc-cassandra
+#      - name: Coveralls
+#        uses: coverallsapp/github-action@master
+#        with:
+#          github-token: ${{ secrets.GITHUB_TOKEN }}
+#          flag-name: ${{ github.job }}
+#          parallel: true
+#          file: .coverage/*.out
+#  functional_ndc_test_cassandra:
+#    name: Functional NDC Test with Cassandra
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Checkout
+#        uses: actions/checkout@v2
+#      - name: Run Functional NDC Tests with Cassandra
+#        uses: nick-fields/retry@v2
+#        with:
+#          timeout_minutes: 30
+#          max_attempts: 2
+#          command: |
+#            docker-compose -f ./develop/buildkite/docker-compose.yml run --entrypoint '/bin/sh -c "git config --global --add safe.directory /temporal && make functional-test-ndc-coverage"'  integration-test-xdc-cassandra
+#      - name: Coveralls
+#        uses: coverallsapp/github-action@master
+#        with:
+#          github-token: ${{ secrets.GITHUB_TOKEN }}
+#          flag-name: ${{ github.job }}
+#          parallel: true
+#          file: .coverage/*.out
+#  functional_test_mysql:
+#    name: Functional Test with MySQL
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Checkout
+#        uses: actions/checkout@v2
+#      - name: Run Functional Tests with MySQL
+#        uses: nick-fields/retry@v2
+#        with:
+#          timeout_minutes: 30
+#          max_attempts: 2
+#          command: |
+#            docker-compose -f ./develop/buildkite/docker-compose.yml run --entrypoint '/bin/sh -c "git config --global --add safe.directory /temporal && make functional-test-coverage"' integration-test-mysql
+#      - name: Coveralls
+#        uses: coverallsapp/github-action@master
+#        with:
+#          github-token: ${{ secrets.GITHUB_TOKEN }}
+#          flag-name: ${{ github.job }}
+#          parallel: true
+#          file: .coverage/*.out
+#  functional_xdc_test_mysql:
+#    name: Functional XDC Test with MySQL
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Checkout
+#        uses: actions/checkout@v2
+#      - name: Run Functional XDC Tests with MySQL
+#        uses: nick-fields/retry@v2
+#        with:
+#          timeout_minutes: 30
+#          max_attempts: 2
+#          command: |
+#            docker-compose -f ./develop/buildkite/docker-compose.yml run --entrypoint '/bin/sh -c "git config --global --add safe.directory /temporal && make functional-test-xdc-coverage"' integration-test-xdc-mysql
+#      - name: Coveralls
+#        uses: coverallsapp/github-action@master
+#        with:
+#          github-token: ${{ secrets.GITHUB_TOKEN }}
+#          flag-name: ${{ github.job }}
+#          parallel: true
+#          file: .coverage/*.out
+#  functional_ndc_test_mysql:
+#    name: Functional NDC Test with MySQL
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Checkout
+#        uses: actions/checkout@v2
+#      - name: Run Functional NDC Tests with MySQL
+#        uses: nick-fields/retry@v2
+#        with:
+#          timeout_minutes: 30
+#          max_attempts: 2
+#          command: |
+#            docker-compose -f ./develop/buildkite/docker-compose.yml run --entrypoint '/bin/sh -c "git config --global --add safe.directory /temporal && make functional-test-ndc-coverage"' integration-test-xdc-mysql
+#      - name: Coveralls
+#        uses: coverallsapp/github-action@master
+#        with:
+#          github-token: ${{ secrets.GITHUB_TOKEN }}
+#          flag-name: ${{ github.job }}
+#          parallel: true
+#          file: .coverage/*.out
+#  functional_test_mysql8:
+#    name: Functional Test with MySQL 8
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Checkout
+#        uses: actions/checkout@v2
+#      - name: Run Functional Tests with MySQL 8
+#        uses: nick-fields/retry@v2
+#        with:
+#          timeout_minutes: 30
+#          max_attempts: 2
+#          command: |
+#            docker-compose -f ./develop/buildkite/docker-compose.yml run --entrypoint '/bin/sh -c "git config --global --add safe.directory /temporal && make functional-test-coverage"' integration-test-mysql8
+#      - name: Coveralls
+#        uses: coverallsapp/github-action@master
+#        with:
+#          github-token: ${{ secrets.GITHUB_TOKEN }}
+#          flag-name: ${{ github.job }}
+#          parallel: true
+#          file: .coverage/*.out
+#  functional_xdc_test_mysql8:
+#    name: Functional XDC Test with MySQL 8
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Checkout
+#        uses: actions/checkout@v2
+#      - name: Run Functional XDC Tests with MySQL 8
+#        uses: nick-fields/retry@v2
+#        with:
+#          timeout_minutes: 30
+#          max_attempts: 2
+#          command: |
+#            docker-compose -f ./develop/buildkite/docker-compose.yml run --entrypoint '/bin/sh -c "git config --global --add safe.directory /temporal && make functional-test-xdc-coverage"' integration-test-xdc-mysql8
+#      - name: Coveralls
+#        uses: coverallsapp/github-action@master
+#        with:
+#          github-token: ${{ secrets.GITHUB_TOKEN }}
+#          flag-name: ${{ github.job }}
+#          parallel: true
+#          file: .coverage/*.out
+#  functional_ndc_test_mysql8:
+#    name: Functional NDC Test with MySQL 8
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Checkout
+#        uses: actions/checkout@v2
+#      - name: Run Functional NDC Tests with MySQL 8
+#        uses: nick-fields/retry@v2
+#        with:
+#          timeout_minutes: 30
+#          max_attempts: 2
+#          command: |
+#            docker-compose -f ./develop/buildkite/docker-compose.yml run --entrypoint '/bin/sh -c "git config --global --add safe.directory /temporal && make functional-test-ndc-coverage"' integration-test-xdc-mysql8
+#      - name: Coveralls
+#        uses: coverallsapp/github-action@master
+#        with:
+#          github-token: ${{ secrets.GITHUB_TOKEN }}
+#          flag-name: ${{ github.job }}
+#          parallel: true
+#          file: .coverage/*.out
+#  functional_test_postgresql:
+#    name: Functional Test with PostgreSQL
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Checkout
+#        uses: actions/checkout@v2
+#      - name: Run Functional Tests with PostgreSQL
+#        uses: nick-fields/retry@v2
+#        with:
+#          timeout_minutes: 30
+#          max_attempts: 2
+#          command: |
+#            docker-compose -f ./develop/buildkite/docker-compose.yml run --entrypoint '/bin/sh -c "git config --global --add safe.directory /temporal && make functional-test-coverage"' integration-test-postgresql
+#      - name: Coveralls
+#        uses: coverallsapp/github-action@master
+#        with:
+#          github-token: ${{ secrets.GITHUB_TOKEN }}
+#          flag-name: ${{ github.job }}
+#          parallel: true
+#          file: .coverage/*.out
+#  functional_xdc_test_postgresql:
+#    name: Functional XDC Test with PostgreSQL
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Checkout
+#        uses: actions/checkout@v2
+#      - name: Run Functional XDC Tests with PostgreSQL
+#        uses: nick-fields/retry@v2
+#        with:
+#          timeout_minutes: 30
+#          max_attempts: 2
+#          command: |
+#            docker-compose -f ./develop/buildkite/docker-compose.yml run --entrypoint '/bin/sh -c "git config --global --add safe.directory /temporal && make functional-test-xdc-coverage"' integration-test-xdc-postgresql
+#      - name: Coveralls
+#        uses: coverallsapp/github-action@master
+#        with:
+#          github-token: ${{ secrets.GITHUB_TOKEN }}
+#          flag-name: ${{ github.job }}
+#          parallel: true
+#          file: .coverage/*.out
+#  functional_ndc_test_postgresql:
+#    name: Functional NDC Test with PostgreSQL
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Checkout
+#        uses: actions/checkout@v2
+#      - name: Run Functional NDC Tests with PostgreSQL
+#        uses: nick-fields/retry@v2
+#        with:
+#          timeout_minutes: 30
+#          max_attempts: 2
+#          command: |
+#            docker-compose -f ./develop/buildkite/docker-compose.yml run --entrypoint '/bin/sh -c "git config --global --add safe.directory /temporal && make functional-test-ndc-coverage"' integration-test-xdc-postgresql
+#      - name: Coveralls
+#        uses: coverallsapp/github-action@master
+#        with:
+#          github-token: ${{ secrets.GITHUB_TOKEN }}
+#          flag-name: ${{ github.job }}
+#          parallel: true
+#          file: .coverage/*.out
+#  functional_test_postgresql12:
+#    name: Functional Test with PostgreSQL 12
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Checkout
+#        uses: actions/checkout@v2
+#      - name: Run Functional Tests with PostgreSQL 12
+#        uses: nick-fields/retry@v2
+#        with:
+#          timeout_minutes: 30
+#          max_attempts: 2
+#          command: |
+#            docker-compose -f ./develop/buildkite/docker-compose.yml run --entrypoint '/bin/sh -c "git config --global --add safe.directory /temporal && make functional-test-coverage"' integration-test-postgresql12
+#      - name: Coveralls
+#        uses: coverallsapp/github-action@master
+#        with:
+#          github-token: ${{ secrets.GITHUB_TOKEN }}
+#          flag-name: ${{ github.job }}
+#          parallel: true
+#          file: .coverage/*.out
+#  functional_xdc_test_postgresql12:
+#    name: Functional XDC Test with PostgreSQL 12
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Checkout
+#        uses: actions/checkout@v2
+#      - name: Run Functional XDC Tests with PostgreSQL 12
+#        uses: nick-fields/retry@v2
+#        with:
+#          timeout_minutes: 30
+#          max_attempts: 2
+#          command: |
+#            docker-compose -f ./develop/buildkite/docker-compose.yml run --entrypoint '/bin/sh -c "git config --global --add safe.directory /temporal && make functional-test-xdc-coverage"' integration-test-xdc-postgresql12
+#      - name: Coveralls
+#        uses: coverallsapp/github-action@master
+#        with:
+#          github-token: ${{ secrets.GITHUB_TOKEN }}
+#          flag-name: ${{ github.job }}
+#          parallel: true
+#          file: .coverage/*.oute
+#  functional_ndc_test_postgresql12:
+#    name: Functional NDC Test with PostgreSQL 12
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Checkout
+#        uses: actions/checkout@v2
+#      - name: Run Functional NDC Tests with PostgreSQL 12
+#        uses: nick-fields/retry@v2
+#        with:
+#          timeout_minutes: 30
+#          max_attempts: 2
+#          command: |
+#            docker-compose -f ./develop/buildkite/docker-compose.yml run --entrypoint '/bin/sh -c "git config --global --add safe.directory /temporal && make functional-test-ndc-coverage"' integration-test-xdc-postgresql12
+#      - name: Coveralls
+#        uses: coverallsapp/github-action@master
+#        with:
+#          github-token: ${{ secrets.GITHUB_TOKEN }}
+#          flag-name: ${{ github.job }}
+#          parallel: true
+#          file: .coverage/*.out
+#  functional_test_sqlite:
+#    name: Functional Test with SQLite
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Checkout
+#        uses: actions/checkout@v2
+#      - name: Run Functional Tests with SQLite
+#        uses: nick-fields/retry@v2
+#        with:
+#          timeout_minutes: 30
+#          max_attempts: 2
+#          command: |
+#            docker-compose -f ./develop/buildkite/docker-compose-sqlite.yml run --entrypoint '/bin/sh -c "git config --global --add safe.directory /temporal && make functional-test-coverage"' integration-test-sqlite
+#      - name: Coveralls
+#        uses: coverallsapp/github-action@master
+#        with:
+#          github-token: ${{ secrets.GITHUB_TOKEN }}
+#          flag-name: ${{ github.job }}
+#          parallel: true
+#          file: .coverage/*.out
+  coverage:
+    name: Coverage Report
+    runs-on: ubuntu-latest
+    needs:
+      - unit_test
+      - integration_test
+      - functional_test_cassandra
+#      - functional_test_cassandra_es8
+#      - functional_xdc_test_cassandra
+#      - functional_ndc_test_cassandra
+#      - functional_test_mysql
+#      - functional_xdc_test_mysql
+#      - functional_ndc_test_mysql
+#      - functional_test_mysql8
+#      - functional_xdc_test_mysql8
+#      - functional_ndc_test_mysql8
+#      - functional_test_postgresql
+#      - functional_xdc_test_postgresql
+#      - functional_ndc_test_postgresql
+#      - functional_test_postgresql12
+#      - functional_xdc_test_postgresql12
+#      - functional_ndc_test_postgresql12
+#      - functional_test_sqlite
+    steps:
+      - name: Coveralls Finished
+        uses: coverallsapp/github-action@master
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          parallel-finished: true
+
+
+
+
