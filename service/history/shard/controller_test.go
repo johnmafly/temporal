@@ -87,7 +87,7 @@ func NewTestController(
 	hostInfoProvider *membership.MockHostInfoProvider,
 ) *ControllerImpl {
 	contextFactory := ContextFactoryProvider(ContextFactoryParams{
-		ArchivalMetadata:            resource.ArchivalMetadata,
+		ArchivalMetadata:            resource.GetArchivalMetadata(),
 		ClientBean:                  resource.GetClientBean(),
 		ClusterMetadata:             resource.GetClusterMetadata(),
 		Config:                      config,
@@ -114,6 +114,7 @@ func NewTestController(
 		resource.GetMetricsHandler(),
 		resource.GetHostInfoProvider(),
 		contextFactory,
+		resource.GetTimeSource(),
 	).(*ControllerImpl)
 }
 
@@ -174,7 +175,7 @@ func (s *controllerSuite) TestAcquireShardSuccess() {
 	// when shard is initialized, it will use the 2 mock function below to initialize the "current" time of each cluster
 	s.mockClusterMetadata.EXPECT().GetCurrentClusterName().Return(cluster.TestCurrentClusterName).AnyTimes()
 	s.mockClusterMetadata.EXPECT().GetAllClusterInfo().Return(cluster.TestSingleDCClusterInfo).AnyTimes()
-	s.shardController.acquireShards()
+	s.shardController.AcquireShards(context.Background())
 	count := 0
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
@@ -215,7 +216,7 @@ func (s *controllerSuite) TestAcquireShardsConcurrently() {
 	// when shard is initialized, it will use the 2 mock function below to initialize the "current" time of each cluster
 	s.mockClusterMetadata.EXPECT().GetCurrentClusterName().Return(cluster.TestCurrentClusterName).AnyTimes()
 	s.mockClusterMetadata.EXPECT().GetAllClusterInfo().Return(cluster.TestSingleDCClusterInfo).AnyTimes()
-	s.shardController.acquireShards()
+	s.shardController.AcquireShards(context.Background())
 	count := 0
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -236,7 +237,7 @@ func (s *controllerSuite) TestAcquireShardLookupFailure() {
 		s.mockServiceResolver.EXPECT().Lookup(convert.Int32ToString(shardID)).Return(nil, errors.New("ring failure"))
 	}
 
-	s.shardController.acquireShards()
+	s.shardController.AcquireShards(context.Background())
 	for shardID := int32(1); shardID <= numShards; shardID++ {
 		s.mockServiceResolver.EXPECT().Lookup(convert.Int32ToString(shardID)).Return(nil, errors.New("ring failure"))
 		shard, err := s.shardController.GetShardByID(shardID)
@@ -259,12 +260,12 @@ func (s *controllerSuite) TestAcquireShardRenewSuccess() {
 	// when shard is initialized, it will use the 2 mock function below to initialize the "current" time of each cluster
 	s.mockClusterMetadata.EXPECT().GetCurrentClusterName().Return(cluster.TestCurrentClusterName).AnyTimes()
 	s.mockClusterMetadata.EXPECT().GetAllClusterInfo().Return(cluster.TestSingleDCClusterInfo).AnyTimes()
-	s.shardController.acquireShards()
+	s.shardController.AcquireShards(context.Background())
 
 	for shardID := int32(1); shardID <= numShards; shardID++ {
 		s.mockServiceResolver.EXPECT().Lookup(convert.Int32ToString(shardID)).Return(s.hostInfo, nil)
 	}
-	s.shardController.acquireShards()
+	s.shardController.AcquireShards(context.Background())
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -292,12 +293,12 @@ func (s *controllerSuite) TestAcquireShardRenewLookupFailed() {
 	// when shard is initialized, it will use the 2 mock function below to initialize the "current" time of each cluster
 	s.mockClusterMetadata.EXPECT().GetCurrentClusterName().Return(cluster.TestCurrentClusterName).AnyTimes()
 	s.mockClusterMetadata.EXPECT().GetAllClusterInfo().Return(cluster.TestSingleDCClusterInfo).AnyTimes()
-	s.shardController.acquireShards()
+	s.shardController.AcquireShards(context.Background())
 
 	for shardID := int32(1); shardID <= numShards; shardID++ {
 		s.mockServiceResolver.EXPECT().Lookup(convert.Int32ToString(shardID)).Return(nil, errors.New("ring failure"))
 	}
-	s.shardController.acquireShards()
+	s.shardController.AcquireShards(context.Background())
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -336,7 +337,7 @@ func (s *controllerSuite) TestHistoryEngineClosed() {
 	s.mockClusterMetadata.EXPECT().GetCurrentClusterName().Return(cluster.TestCurrentClusterName).AnyTimes()
 	s.mockClusterMetadata.EXPECT().GetAllClusterInfo().Return(cluster.TestSingleDCClusterInfo).AnyTimes()
 	s.shardController.Start()
-	s.shardController.acquireShards()
+	s.shardController.AcquireShards(context.Background())
 
 	var workerWG sync.WaitGroup
 	for w := 0; w < 10; w++ {
@@ -437,7 +438,7 @@ func (s *controllerSuite) TestShardControllerClosed() {
 	s.mockClusterMetadata.EXPECT().GetCurrentClusterName().Return(cluster.TestCurrentClusterName).AnyTimes()
 	s.mockClusterMetadata.EXPECT().GetAllClusterInfo().Return(cluster.TestSingleDCClusterInfo).AnyTimes()
 	s.shardController.Start()
-	s.shardController.acquireShards()
+	s.shardController.AcquireShards(context.Background())
 
 	var workerWG sync.WaitGroup
 	for w := 0; w < 10; w++ {
@@ -694,7 +695,7 @@ func (s *controllerSuite) TestShardControllerFuzz() {
 	}
 
 	s.shardController.Start()
-	s.shardController.acquireShards()
+	s.shardController.AcquireShards(context.Background())
 
 	var workers goro.Group
 	for i := 0; i < 10; i++ {

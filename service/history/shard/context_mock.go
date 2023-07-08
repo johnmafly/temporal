@@ -1407,16 +1407,16 @@ func (mr *MockControllableContextMockRecorder) SetWorkflowExecution(ctx, request
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetWorkflowExecution", reflect.TypeOf((*MockControllableContext)(nil).SetWorkflowExecution), ctx, request)
 }
 
-// Unload mocks base method.
-func (m *MockControllableContext) Unload() {
+// UnloadForOwnershipLost mocks base method.
+func (m *MockControllableContext) UnloadForOwnershipLost() {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Unload")
+	m.ctrl.Call(m, "UnloadForOwnershipLost")
 }
 
-// Unload indicates an expected call of Unload.
-func (mr *MockControllableContextMockRecorder) Unload() *gomock.Call {
+// UnloadForOwnershipLost indicates an expected call of UnloadForOwnershipLost.
+func (mr *MockControllableContextMockRecorder) UnloadForOwnershipLost() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Unload", reflect.TypeOf((*MockControllableContext)(nil).Unload))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UnloadForOwnershipLost", reflect.TypeOf((*MockControllableContext)(nil).UnloadForOwnershipLost))
 }
 
 // UpdateHandoverNamespace mocks base method.
