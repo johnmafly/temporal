@@ -281,10 +281,15 @@ func (c *ControllerImpl) removeShardLocked(shardID int32, expected ControllableC
 	if !ok {
 		return nil
 	}
-	if expected != nil && current != expected {
-		// the shard comparison is a defensive check to make sure we are deleting
-		// what we intend to delete.
-		return nil
+	if expected != nil {
+		if current != expected {
+			// the shard comparison is a defensive check to make sure we are deleting
+			// what we intend to delete.
+			return nil
+		}
+		if current.StoppedForOwnershipLost() {
+			c.ownership.ReportShardOwnershipLost(shardID)
+		}
 	}
 
 	delete(c.historyShards, shardID)

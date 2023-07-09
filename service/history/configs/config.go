@@ -77,9 +77,10 @@ type Config struct {
 	EventsCacheTTL         dynamicconfig.DurationPropertyFn
 
 	// ShardController settings
-	RangeSizeBits           uint
-	AcquireShardInterval    dynamicconfig.DurationPropertyFn
-	AcquireShardConcurrency dynamicconfig.IntPropertyFn
+	RangeSizeBits                          uint
+	AcquireShardInterval                   dynamicconfig.DurationPropertyFn
+	AcquireShardConcurrency                dynamicconfig.IntPropertyFn
+	ShardOwnershipLostReacquireMinDuration dynamicconfig.DurationPropertyFn
 
 	// the artificial delay added to standby cluster's view of active cluster's time
 	StandbyClusterDelay                  dynamicconfig.DurationPropertyFn
