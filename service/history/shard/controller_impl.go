@@ -143,6 +143,7 @@ func (c *ControllerImpl) GetPingChecks() []common.PingCheck {
 			for _, shard := range c.historyShards {
 				out = append(out, shard)
 			}
+			out = append(out, c.ownership)
 			return out
 		},
 		MetricsName: metrics.ShardControllerLockLatency.GetMetricName(),
@@ -278,10 +279,15 @@ func (c *ControllerImpl) removeShardLocked(shardID int32, expected ControllableC
 	if !ok {
 		return nil
 	}
-	if expected != nil && current != expected {
-		// the shard comparison is a defensive check to make sure we are deleting
-		// what we intend to delete.
-		return nil
+	if expected != nil {
+		if current != expected {
+			// the shard comparison is a defensive check to make sure we are deleting
+			// what we intend to delete.
+			return nil
+		}
+		if current.StoppedForOwnershipLost() {
+			c.ownership.reportShardOwnershipLost(shardID)
+		}
 	}
 
 	delete(c.historyShards, shardID)

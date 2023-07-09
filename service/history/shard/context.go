@@ -129,5 +129,6 @@ type (
 
 		common.Pingable
 		FinishStop()
+		StoppedForOwnershipLost() bool
 	}
 )

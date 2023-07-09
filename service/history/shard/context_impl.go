@@ -1394,7 +1394,7 @@ func (s *ContextImpl) IsValid() bool {
 	return s.state < contextStateStopping
 }
 
-func (s *ContextImpl) stoppedForOwnershipLost() bool {
+func (s *ContextImpl) StoppedForOwnershipLost() bool {
 	s.stateLock.Lock()
 	defer s.stateLock.Unlock()
 	return s.state >= contextStateStopping && s.stopReason == stopReasonOwnershipLost

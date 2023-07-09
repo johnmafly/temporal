@@ -688,7 +688,7 @@ func (s *contextSuite) TestShardStopReasonAssertOwnership() {
 	s.Error(err)
 
 	s.False(s.mockShard.IsValid())
-	s.True(s.mockShard.stoppedForOwnershipLost())
+	s.True(s.mockShard.StoppedForOwnershipLost())
 }
 
 func (s *contextSuite) TestShardStopReasonShardRead() {
@@ -700,7 +700,7 @@ func (s *contextSuite) TestShardStopReasonShardRead() {
 	s.Error(err)
 
 	s.False(s.mockShard.IsValid())
-	s.True(s.mockShard.stoppedForOwnershipLost())
+	s.True(s.mockShard.StoppedForOwnershipLost())
 }
 
 func (s *contextSuite) TestShardStopReasonAcquireShard() {
@@ -712,7 +712,7 @@ func (s *contextSuite) TestShardStopReasonAcquireShard() {
 
 	s.Assert().Equal(contextStateStopping, s.mockShard.state)
 	s.False(s.mockShard.IsValid())
-	s.True(s.mockShard.stoppedForOwnershipLost())
+	s.True(s.mockShard.StoppedForOwnershipLost())
 }
 
 func (s *contextSuite) TestShardStopReasonUnload() {
@@ -722,7 +722,7 @@ func (s *contextSuite) TestShardStopReasonUnload() {
 
 	s.Assert().Equal(contextStateStopping, s.mockShard.state)
 	s.False(s.mockShard.IsValid())
-	s.True(s.mockShard.stoppedForOwnershipLost())
+	s.True(s.mockShard.StoppedForOwnershipLost())
 }
 
 func (s *contextSuite) TestShardStopReasonCloseShard() {
@@ -732,5 +732,5 @@ func (s *contextSuite) TestShardStopReasonCloseShard() {
 	s.mockShard.FinishStop()
 
 	s.False(s.mockShard.IsValid())
-	s.False(s.mockShard.stoppedForOwnershipLost())
+	s.False(s.mockShard.StoppedForOwnershipLost())
 }

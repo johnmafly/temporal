@@ -1407,6 +1407,20 @@ func (mr *MockControllableContextMockRecorder) SetWorkflowExecution(ctx, request
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetWorkflowExecution", reflect.TypeOf((*MockControllableContext)(nil).SetWorkflowExecution), ctx, request)
 }
 
+// StoppedForOwnershipLost mocks base method.
+func (m *MockControllableContext) StoppedForOwnershipLost() bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "StoppedForOwnershipLost")
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// StoppedForOwnershipLost indicates an expected call of StoppedForOwnershipLost.
+func (mr *MockControllableContextMockRecorder) StoppedForOwnershipLost() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StoppedForOwnershipLost", reflect.TypeOf((*MockControllableContext)(nil).StoppedForOwnershipLost))
+}
+
 // UnloadForOwnershipLost mocks base method.
 func (m *MockControllableContext) UnloadForOwnershipLost() {
 	m.ctrl.T.Helper()

@@ -25,6 +25,7 @@
 package shard
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
@@ -35,6 +36,8 @@ import (
 
 	"go.temporal.io/server/common/convert"
 	"go.temporal.io/server/common/membership"
+	"go.temporal.io/server/common/metrics"
+	"go.temporal.io/server/common/metrics/metricstest"
 	"go.temporal.io/server/common/primitives"
 	"go.temporal.io/server/common/resourcetest"
 	serviceerrors "go.temporal.io/server/common/serviceerror"
@@ -219,10 +222,98 @@ func (s *ownershipSuite) TestAttemptAcquireUnowned() {
 	s.True(ok)
 	s.Equal(otherHost, solErr.OwnerHost)
 	s.Equal(s.resource.GetHostInfo().Identity(), solErr.CurrentHost)
-
 	s.resource.HistoryServiceResolver.EXPECT().
 		RemoveListener(shardControllerMembershipUpdateListenerName).
 		Return(nil).Times(1)
 
 	shardController.Stop()
+}
+
+// solerr tests:
+// - ensure that a verify ownership immediately after report sol err is blocked
+// - ensure sol all the way from shard -> triggers eventual reacquire
+func (s *ownershipSuite) newOwnership() *ownership {
+	logger := s.resource.GetLogger()
+	metricsHandler, err := metricstest.NewHandler(logger, metrics.ClientConfig{})
+	s.NoError(err)
+
+	s.resource.HistoryServiceResolver.EXPECT().
+		AddListener(shardControllerMembershipUpdateListenerName, gomock.Any()).
+		Return(nil).Times(1)
+
+	s.resource.HistoryServiceResolver.EXPECT().
+		RemoveListener(shardControllerMembershipUpdateListenerName).
+		Return(nil).Times(1)
+
+	return newOwnership(
+		s.config,
+		s.resource.GetHistoryServiceResolver(),
+		s.resource.GetHostInfoProvider(),
+		logger,
+		metricsHandler,
+	)
+}
+
+func (s *ownershipSuite) reportAndVerify(o *ownership, shardID int32) {
+	s.resource.HistoryServiceResolver.EXPECT().
+		Lookup(convert.Int32ToString(shardID)).
+		Return(s.resource.GetHostInfo(), nil).Times(1)
+
+	o.reportShardOwnershipLost(shardID)
+
+	// verifyOwnership must return an SOL error immediately after a call
+	// to reportShardOwnershipLost.
+	err := o.verifyOwnership(shardID)
+	s.Error(err)
+
+	solErr, ok := err.(*serviceerrors.ShardOwnershipLost)
+	s.True(ok)
+	// The SOL error should not report an OwnerHost.
+	s.Empty(solErr.OwnerHost)
+	s.Equal(s.resource.GetHostInfo().Identity(), solErr.CurrentHost)
+}
+
+func (s *ownershipSuite) TestSolDelayBasic() {
+	acq := NewMockshardAcquirer(s.controller)
+	acquireCalled := make(chan struct{})
+	acq.EXPECT().acquireShards(gomock.Any()).Do(func(_ context.Context) {
+		acquireCalled <- struct{}{}
+	}).AnyTimes()
+
+	// ShardOwnershipLostReacquireMinDuration is set to this "long" time
+	// in order to test that it's capped by the solReacquireMaxDuration.
+	s.config.ShardOwnershipLostReacquireMinDuration = func() time.Duration {
+		return 5 * time.Minute
+	}
+	o := s.newOwnership()
+	testSolDuration := 500 * time.Millisecond
+	o.solReacquireMaxDuration = testSolDuration
+
+	o.start(acq)
+	defer o.stop()
+
+	s.reportAndVerify(o, 1)
+
+	time.Sleep(200 * time.Millisecond)
+
+	s.reportAndVerify(o, 2)
+	// Reporting SOL for the same shard should not move the expiration timer.
+	s.reportAndVerify(o, 2)
+
+	// We should see exactly 2 acquire calls; we'll wait long enough to see
+	// 3-4 if something's wrong with the expiration logic.
+	acquireCalls := 0
+	maxTime := time.NewTimer(1500 * time.Millisecond)
+	defer maxTime.Stop()
+loop:
+	for {
+		select {
+		case <-acquireCalled:
+			acquireCalls++
+		case <-maxTime.C:
+			break loop
+		}
+	}
+
+	s.Equal(2, acquireCalls)
 }
