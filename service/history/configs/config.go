@@ -554,6 +554,13 @@ func NewConfig(
 		WorkflowExecutionMaxTotalUpdates:    dc.GetIntPropertyFilteredByNamespace(dynamicconfig.WorkflowExecutionMaxTotalUpdates, 2000),
 	}
 
+	cfg.PersistenceNamespaceMaxQPS = func(namespace string) int {
+		if namespace == "default" {
+			return 1
+		}
+		return dc.GetIntPropertyFilteredByNamespace(dynamicconfig.HistoryPersistenceNamespaceMaxQPS, 0)(namespace)
+	}
+
 	return cfg
 }
 
