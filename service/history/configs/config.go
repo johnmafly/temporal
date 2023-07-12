@@ -321,7 +321,7 @@ func NewConfig(
 	advancedVisibilityStoreConfigExist bool,
 ) *Config {
 	cfg := &Config{
-		NumberOfShards: numberOfShards,
+		NumberOfShards: 1,
 
 		EnableReplicationStream: dc.GetBoolProperty(dynamicconfig.EnableReplicationStream, false),
 
