@@ -559,5 +559,5 @@ func NewConfig(
 
 // GetShardID return the corresponding shard ID for a given namespaceID and workflowID pair
 func (config *Config) GetShardID(namespaceID namespace.ID, workflowID string) int32 {
-	return common.WorkflowIDToHistoryShard(namespaceID.String(), workflowID, config.NumberOfShards)
+	return common.WorkflowIDToHistoryShard(namespaceID.String(), workflowID, 1)
 }
