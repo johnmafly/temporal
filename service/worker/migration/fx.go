@@ -92,15 +92,16 @@ func (wc *replicationWorkerComponent) DedicatedWorkerOptions() *workercommon.Ded
 
 func (wc *replicationWorkerComponent) activities() *activities {
 	return &activities{
-		historyShardCount:         wc.PersistenceConfig.NumHistoryShards,
-		executionManager:          wc.ExecutionManager,
-		namespaceRegistry:         wc.NamespaceRegistry,
-		historyClient:             wc.HistoryClient,
-		frontendClient:            wc.FrontendClient,
-		clientFactory:             wc.ClientFactory,
-		namespaceReplicationQueue: wc.NamespaceReplicationQueue,
-		taskManager:               wc.TaskManager,
-		logger:                    wc.Logger,
-		metricsHandler:            wc.MetricsHandler,
+		historyShardCount:              wc.PersistenceConfig.NumHistoryShards,
+		executionManager:               wc.ExecutionManager,
+		namespaceRegistry:              wc.NamespaceRegistry,
+		historyClient:                  wc.HistoryClient,
+		frontendClient:                 wc.FrontendClient,
+		clientFactory:                  wc.ClientFactory,
+		namespaceReplicationQueue:      wc.NamespaceReplicationQueue,
+		taskManager:                    wc.TaskManager,
+		logger:                         wc.Logger,
+		metricsHandler:                 wc.MetricsHandler,
+		forceReplicationMetricsHandler: wc.MetricsHandler.WithTags(metrics.WorkflowTypeTag(forceReplicationWorkflowName)),
 	}
 }

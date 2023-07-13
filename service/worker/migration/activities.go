@@ -97,7 +97,7 @@ func (r VerifyResult) isSkipped() bool {
 	return r.Status == VERIFY_SKIPPED
 }
 
-func (r VerifyResult) isFinished() bool {
+func (r VerifyResult) isCompleted() bool {
 	return r.isVerified() || r.isSkipped()
 }
 
@@ -325,24 +325,18 @@ func (a *activities) generateWorkflowReplicationTask(ctx context.Context, rateLi
 		},
 	})
 
-	metricsHander := a.metricsHandler.WithTags(metrics.WorkflowTypeTag(forceReplicationWorkflowName))
-	switch err.(type) {
-	case nil:
-		metricsHander.Counter(metrics.GenerateHistoryReplicationTasksCount.GetMetricName()).Record(1)
-		stateTransitionCount := resp.StateTransitionCount
-		for stateTransitionCount > 0 {
-			token := util.Min(int(stateTransitionCount), rateLimiter.Burst())
-			stateTransitionCount -= int64(token)
-			_ = rateLimiter.ReserveN(time.Now(), token)
-		}
-		return nil
-	case *serviceerror.NotFound:
-		metricsHander.Counter(metrics.GenerateHistoryReplicationTasksError.GetMetricName()).Record(1, metrics.ServiceErrorTypeTag(err))
-		return nil
-	default:
-		metricsHander.Counter(metrics.GenerateHistoryReplicationTasksError.GetMetricName()).Record(1, metrics.ServiceErrorTypeTag(err))
+	if err != nil {
 		return err
 	}
+
+	stateTransitionCount := resp.StateTransitionCount
+	for stateTransitionCount > 0 {
+		token := util.Min(int(stateTransitionCount), rateLimiter.Burst())
+		stateTransitionCount -= int64(token)
+		_ = rateLimiter.ReserveN(time.Now(), token)
+	}
+
+	return nil
 }
 
 func (a *activities) UpdateNamespaceState(ctx context.Context, req updateStateRequest) error {
@@ -433,10 +427,11 @@ func (a *activities) GenerateReplicationTasks(ctx context.Context, request *gene
 
 	for i := startIndex; i < len(request.Executions); i++ {
 		we := request.Executions[i]
-		err := a.generateWorkflowReplicationTask(ctx, rateLimiter, definition.NewWorkflowKey(request.NamespaceID, we.WorkflowId, we.RunId))
-		if err != nil {
-			a.logger.Error("force-replication failed to generate replication task", tag.WorkflowNamespaceID(request.NamespaceID), tag.WorkflowID(we.WorkflowId), tag.WorkflowRunID(we.RunId), tag.Error(err))
-			return err
+		if err := a.generateWorkflowReplicationTask(ctx, rateLimiter, definition.NewWorkflowKey(request.NamespaceID, we.WorkflowId, we.RunId)); err != nil {
+			if _, isNotFound := err.(*serviceerror.NotFound); !isNotFound {
+				a.logger.Error("force-replication failed to generate replication task", tag.WorkflowNamespaceID(request.NamespaceID), tag.WorkflowID(we.WorkflowId), tag.WorkflowRunID(we.RunId), tag.Error(err))
+				return err
+			}
 		}
 		activity.RecordHeartbeat(ctx, i)
 	}
@@ -541,11 +536,13 @@ func (a *activities) createReplicationTasks(ctx context.Context, request *genear
 
 	for i := 0; i < len(request.Executions); i++ {
 		r := &detail.Results[i]
-		if r.isFinished() {
+		if r.isCompleted() {
 			continue
 		}
 
 		we := request.Executions[i]
+		tags := []tag.Tag{tag.WorkflowType(forceReplicationWorkflowName), tag.WorkflowNamespaceID(request.NamespaceID), tag.WorkflowID(we.WorkflowId), tag.WorkflowRunID(we.RunId)}
+
 		resp, err := a.historyClient.DescribeMutableState(ctx, &historyservice.DescribeMutableStateRequest{
 			NamespaceId: request.NamespaceID,
 			Execution:   &we,
@@ -554,24 +551,32 @@ func (a *activities) createReplicationTasks(ctx context.Context, request *genear
 		switch err.(type) {
 		case nil:
 			if resp.GetCacheMutableState().GetExecutionState().GetState() == enumsspb.WORKFLOW_EXECUTION_STATE_ZOMBIE {
-				a.metricsHandler.Counter(metrics.ForceReplicationZombieWorkflowEncountered.GetMetricName()).Record(1)
-				a.logger.Info("createReplicationTasks skip Zombie workflow", tag.WorkflowNamespaceID(request.NamespaceID), tag.WorkflowID(we.WorkflowId), tag.WorkflowRunID(we.RunId), tag.Error(err))
+				a.forceReplicationMetricsHandler.Counter(metrics.EncounterZombieWorkflowCount.GetMetricName()).Record(1)
+				a.logger.Info("createReplicationTasks skip Zombie workflow", tags...)
+
 				r.Status = VERIFY_SKIPPED
 				r.Reason = reasonZombieWorkflow
 				continue
 			}
 
 			if !r.isCreatedToBeVerified() {
-				if err := a.generateWorkflowReplicationTask(ctx, rateLimiter, definition.NewWorkflowKey(request.NamespaceID, we.WorkflowId, we.RunId)); err != nil {
-					a.logger.Error("createReplicationTasks failed to generate replication task", tag.WorkflowNamespaceID(request.NamespaceID), tag.WorkflowID(we.WorkflowId), tag.WorkflowRunID(we.RunId), tag.Error(err))
+				err := a.generateWorkflowReplicationTask(ctx, rateLimiter, definition.NewWorkflowKey(request.NamespaceID, we.WorkflowId, we.RunId))
+
+				switch err.(type) {
+				case nil:
+					// replication task was created
+					r.Status = CREATED_TO_BE_VERIFIED
+				case *serviceerror.NotFound:
+					// rare case but in case if execution was deleted after above DescribeMutableState
+					r.Status = VERIFY_SKIPPED
+					r.Reason = reasonDeletedWorkflow
+				default:
+					a.logger.Error(fmt.Sprintf("createReplicationTasks failed to generate replication task. Error: %v", err), tags...)
 					return err
 				}
-
-				r.Status = CREATED_TO_BE_VERIFIED
 			}
 
 		case *serviceerror.NotFound:
-			a.logger.Info("createReplicationTasks skip deleted workflow", tag.WorkflowNamespaceID(request.NamespaceID), tag.WorkflowID(we.WorkflowId), tag.WorkflowRunID(we.RunId), tag.Error(err))
 			r.Status = VERIFY_SKIPPED
 			r.Reason = reasonDeletedWorkflow
 
@@ -594,10 +599,11 @@ func (a *activities) verifyReplicationTasks(
 		r := &detail.Results[i]
 		we := request.Executions[i]
 		if r.isNotCreated() {
+			// invalid state
 			return false, progress, temporal.NewNonRetryableApplicationError(fmt.Sprintf("verifyReplicationTasks: replication task for %v was not created", we), "", nil)
 		}
 
-		if r.isFinished() {
+		if r.isCompleted() {
 			continue
 		}
 
@@ -608,7 +614,7 @@ func (a *activities) verifyReplicationTasks(
 
 		switch err.(type) {
 		case nil:
-			a.metricsHandler.Counter(metrics.ForceReplicationVerifySingleTaskSuccess.GetMetricName()).Record(1)
+			a.forceReplicationMetricsHandler.Counter(metrics.VerifyReplicationTaskSuccess.GetMetricName()).Record(1)
 			r.Status = VERIFIED
 			progress = true
 
@@ -629,8 +635,8 @@ func (e verifyReplicationTasksTimeoutErr) Error() string {
 }
 
 const (
-	defaultNoProgressRetryTimeout  = 5 * time.Minute
-	defaultNoProgressFailedTimeout = 15 * time.Minute
+	defaultNoProgressRetryableTimeout    = 5 * time.Minute
+	defaultNoProgressNotRetryableTimeout = 15 * time.Minute
 )
 
 func (a *activities) GenerateAndVerifyReplicationTasks(ctx context.Context, request *genearteAndVerifyReplicationTasksRequest) error {
@@ -652,54 +658,50 @@ func (a *activities) GenerateAndVerifyReplicationTasks(ctx context.Context, requ
 		activity.RecordHeartbeat(ctx, details)
 	}
 
-	info := activity.GetInfo(ctx)
 	start := time.Now()
 	if err := a.createReplicationTasks(ctx, request, &details); err != nil {
 		return err
 	}
+	a.forceReplicationMetricsHandler.Timer(metrics.CreateReplicationTasksLatency.GetMetricName()).Record(time.Since(start))
 
-	a.logger.Info("createReplicationTasks", tag.NewStringTag("activityID", info.ActivityID), tag.NewDurationTag("latency", time.Since(start)))
 	activity.RecordHeartbeat(ctx, details)
 
 	for {
 		var verified, progress bool
 		var err error
-		a.metricsHandler.Counter(metrics.ForceReplicationVerifyTasksAttempts.GetMetricName()).Record(1)
 
 		start := time.Now()
 		if verified, progress, err = a.verifyReplicationTasks(ctx, request, &details, remoteClient); err != nil {
 			return err
 		}
-		a.logger.Info("verifyReplicationTasks", tag.NewStringTag("activityID", info.ActivityID), tag.NewDurationTag("latency", time.Since(start)))
+		a.forceReplicationMetricsHandler.Timer(metrics.VerifyReplicationTasksLatency.GetMetricName()).Record(time.Since(start))
 
 		if progress {
 			details.CheckPoint = time.Now()
 		}
 
-		start = time.Now()
 		activity.RecordHeartbeat(ctx, details)
-		a.logger.Info("RecordHeartbeat", tag.NewStringTag("activityID", info.ActivityID), tag.NewDurationTag("latency", time.Since(start)))
 
 		if verified == true {
-			a.metricsHandler.Counter(metrics.ForceReplicationVerifyTasksSuccess.GetMetricName()).Record(1)
 			return nil
 		}
 
 		diff := time.Now().Sub(details.CheckPoint)
-		if diff > defaultNoProgressRetryTimeout && diff < defaultNoProgressFailedTimeout {
+		if diff > defaultNoProgressRetryableTimeout {
+			if diff > defaultNoProgressNotRetryableTimeout {
+				// Potentially encountered a missing execution, return non-retryable error
+				return temporal.NewNonRetryableApplicationError(
+					fmt.Sprintf("verifyReplicationTasks was not able to make progress for more than %v minutes (not retryable). Not found WorkflowExecution: %v, Checkpoint: %v",
+						diff.Minutes(),
+						details.LastNotFoundWorkflowExecution, details.CheckPoint),
+					"", nil)
+			}
+
 			// return error to trigger activity retry
 			return fmt.Errorf("verifyReplicationTasks was not able to make progress for more than %v minutes (retryable). Not found WorkflowExecution: %v,",
 				diff.Minutes(),
 				details.LastNotFoundWorkflowExecution,
 			)
-
-		} else if diff > defaultNoProgressFailedTimeout {
-			// Potentially encountered a missing workflow, return non-retryable error
-			return temporal.NewNonRetryableApplicationError(
-				fmt.Sprintf("verifyReplicationTasks was not able to make progress for more than %v minutes (not retryable). Not found WorkflowExecution: %v, Checkpoint: %v",
-					diff.Minutes(),
-					details.LastNotFoundWorkflowExecution, details.CheckPoint),
-				"", nil)
 		}
 
 		time.Sleep(request.VerifyInterval)
