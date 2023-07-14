@@ -29,6 +29,7 @@ import (
 	"fmt"
 
 	"github.com/golang/mock/gomock"
+	"golang.org/x/sync/semaphore"
 
 	"go.temporal.io/server/api/historyservice/v1"
 	persistencespb "go.temporal.io/server/api/persistence/v1"
@@ -59,6 +60,7 @@ func NewTestContextWithTimeSource(
 ) *ContextTest {
 	result := NewTestContext(ctrl, shardInfo, config)
 	result.timeSource = timeSource
+	result.taskKeyManager.allocator.timeSource = timeSource
 	result.Resource.TimeSource = timeSource
 	return result
 }
@@ -104,6 +106,8 @@ func NewTestContext(
 		historyClient:           resourceTest.GetHistoryClient(),
 		archivalMetadata:        resourceTest.GetArchivalMetadata(),
 		hostInfoProvider:        hostInfoProvider,
+
+		ioSemaphore: semaphore.NewWeighted(1),
 	}
 	shard.taskKeyManager = newTaskKeyManager(
 		shard.timeSource,
@@ -113,6 +117,7 @@ func NewTestContext(
 			return shard.renewRangeLocked(false)
 		},
 	)
+	shard.taskKeyManager.setRangeID(shardInfo.RangeId)
 	return &ContextTest{
 		Resource:        resourceTest,
 		ContextImpl:     shard,

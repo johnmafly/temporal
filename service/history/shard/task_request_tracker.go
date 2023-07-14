@@ -33,14 +33,7 @@ import (
 type (
 	taskRequestCompletionFn func(error)
 
-	taskRequestTracker interface {
-		track(...map[tasks.Category][]tasks.Task) taskRequestCompletionFn
-		minTaskKey(tasks.Category) (tasks.Key, bool)
-		drain()
-		clear()
-	}
-
-	taskRequestTrackerImpl struct {
+	taskRequestTracker struct {
 		sync.Mutex
 
 		// using priority queue to track the min pending task key
@@ -52,18 +45,18 @@ type (
 	}
 )
 
-func newTaskRequestTracker() *taskRequestTrackerImpl {
+func newTaskRequestTracker() *taskRequestTracker {
 	outstandingTaskKeys := make(map[tasks.Category]map[tasks.Key]struct{})
 	for _, category := range tasks.GetCategories() {
 		outstandingTaskKeys[category] = make(map[tasks.Key]struct{})
 	}
-	return &taskRequestTrackerImpl{
+	return &taskRequestTracker{
 		outstandingTaskKeys: outstandingTaskKeys,
 		waitChannels:        make([]chan<- struct{}, 0),
 	}
 }
 
-func (t *taskRequestTrackerImpl) track(
+func (t *taskRequestTracker) track(
 	taskMaps ...map[tasks.Category][]tasks.Task,
 ) taskRequestCompletionFn {
 	t.Lock()
@@ -114,7 +107,7 @@ func (t *taskRequestTrackerImpl) track(
 	}
 }
 
-func (t *taskRequestTrackerImpl) minTaskKey(
+func (t *taskRequestTracker) minTaskKey(
 	category tasks.Category,
 ) (tasks.Key, bool) {
 	t.Lock()
@@ -135,7 +128,7 @@ func (t *taskRequestTrackerImpl) minTaskKey(
 	return minKey, true
 }
 
-func (t *taskRequestTrackerImpl) drain() {
+func (t *taskRequestTracker) drain() {
 	t.Lock()
 
 	if t.outstandingRequestCount == 0 {
@@ -150,7 +143,7 @@ func (t *taskRequestTrackerImpl) drain() {
 	<-waitCh
 }
 
-func (t *taskRequestTrackerImpl) clear() {
+func (t *taskRequestTracker) clear() {
 	t.Lock()
 	defer t.Unlock()
 
@@ -161,7 +154,7 @@ func (t *taskRequestTrackerImpl) clear() {
 	t.closeWaitChannelsLocked()
 }
 
-func (t *taskRequestTrackerImpl) closeWaitChannelsLocked() {
+func (t *taskRequestTracker) closeWaitChannelsLocked() {
 	for _, waitCh := range t.waitChannels {
 		close(waitCh)
 	}

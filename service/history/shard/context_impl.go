@@ -140,7 +140,7 @@ type (
 		shardInfo   *persistencespb.ShardInfo
 
 		ioSemaphore    *semaphore.Weighted
-		taskKeyManager taskKeyManager
+		taskKeyManager *taskKeyManager
 
 		// exist only in memory
 		remoteClusterInfos      map[string]*remoteClusterInfo

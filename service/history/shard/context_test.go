@@ -108,7 +108,7 @@ func (s *contextSuite) SetupTest() {
 }
 
 func (s *contextSuite) TestOverwriteScheduledTaskTimestamp() {
-	now := s.timeSource.Now()
+	now := time.Now()
 	s.timeSource.Update(now)
 	maxReadLevel := s.mockShard.GetQueueExclusiveHighReadWatermark(tasks.CategoryTimer)
 

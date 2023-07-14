@@ -34,33 +34,19 @@ import (
 )
 
 type (
-	taskKeyManager interface {
-		allocateTaskKey(...map[tasks.Category][]tasks.Task) (taskRequestCompletionFn, error)
-		peekNextTaskKey(tasks.Category) tasks.Key
-		generateTaskKey(tasks.Category) (tasks.Key, error)
-		drainTaskRequests()
-
-		setRangeID(int64)
-		setTaskMinScheduledTime(time.Time)
-
-		getExclusiveReaderHighWatermark(tasks.Category) tasks.Key
-	}
-
-	taskKeyManagerImpl struct {
-		allocator taskKeyAllocator
-		tracker   taskRequestTracker
+	taskKeyManager struct {
+		allocator *taskKeyAllocator
+		tracker   *taskRequestTracker
 	}
 )
-
-var _ taskKeyManager = (*taskKeyManagerImpl)(nil)
 
 func newTaskKeyManager(
 	timeSource clock.TimeSource,
 	config *configs.Config,
 	logger log.Logger,
 	renewRangeIDFn renewRangeIDFn,
-) *taskKeyManagerImpl {
-	manager := &taskKeyManagerImpl{
+) *taskKeyManager {
+	manager := &taskKeyManager{
 		tracker: newTaskRequestTracker(),
 	}
 	manager.allocator = newTaskKeyAllocator(
@@ -74,7 +60,7 @@ func newTaskKeyManager(
 	return manager
 }
 
-func (m *taskKeyManagerImpl) allocateTaskKey(
+func (m *taskKeyManager) allocateTaskKey(
 	taskMaps ...map[tasks.Category][]tasks.Task,
 ) (taskRequestCompletionFn, error) {
 
@@ -85,23 +71,23 @@ func (m *taskKeyManagerImpl) allocateTaskKey(
 	return m.tracker.track(taskMaps...), nil
 }
 
-func (m *taskKeyManagerImpl) peekNextTaskKey(
+func (m *taskKeyManager) peekNextTaskKey(
 	category tasks.Category,
 ) tasks.Key {
 	return m.allocator.peekNextTaskKey(category)
 }
 
-func (m *taskKeyManagerImpl) generateTaskKey(
+func (m *taskKeyManager) generateTaskKey(
 	category tasks.Category,
 ) (tasks.Key, error) {
 	return m.allocator.generateTaskKey(category)
 }
 
-func (m *taskKeyManagerImpl) drainTaskRequests() {
+func (m *taskKeyManager) drainTaskRequests() {
 	m.tracker.drain()
 }
 
-func (m *taskKeyManagerImpl) setRangeID(
+func (m *taskKeyManager) setRangeID(
 	rangeID int64,
 ) {
 	m.allocator.setRangeID(rangeID)
@@ -111,13 +97,13 @@ func (m *taskKeyManagerImpl) setRangeID(
 	m.tracker.clear()
 }
 
-func (m *taskKeyManagerImpl) setTaskMinScheduledTime(
+func (m *taskKeyManager) setTaskMinScheduledTime(
 	taskMinScheduledTime time.Time,
 ) {
 	m.allocator.setTaskMinScheduledTime(taskMinScheduledTime)
 }
 
-func (m *taskKeyManagerImpl) getExclusiveReaderHighWatermark(
+func (m *taskKeyManager) getExclusiveReaderHighWatermark(
 	category tasks.Category,
 ) tasks.Key {
 	minTaskKey, ok := m.tracker.minTaskKey(category)

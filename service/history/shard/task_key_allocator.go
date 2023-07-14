@@ -38,17 +38,9 @@ import (
 )
 
 type (
-	taskKeyAllocator interface {
-		allocate(...map[tasks.Category][]tasks.Task) error
-		peekNextTaskKey(tasks.Category) tasks.Key
-		generateTaskKey(tasks.Category) (tasks.Key, error)
-		setRangeID(int64)
-		setTaskMinScheduledTime(time.Time)
-	}
-
 	renewRangeIDFn func() error
 
-	taskKeyAllocatorImpl struct {
+	taskKeyAllocator struct {
 		nextTaskID         int64
 		exclusiveMaxTaskID int64
 
@@ -69,9 +61,9 @@ func newTaskKeyAllocator(
 	taskScheduleTimeShift dynamicconfig.DurationPropertyFn,
 	logger log.Logger,
 	renewRangeIDFn renewRangeIDFn,
-) *taskKeyAllocatorImpl {
+) *taskKeyAllocator {
 	// TODO: assert rangeID and minScheduledTime are set
-	return &taskKeyAllocatorImpl{
+	return &taskKeyAllocator{
 		rangeSizeBits:          rangeSizeBits,
 		timeSource:             timeSource,
 		taskScheduledTimeShift: taskScheduleTimeShift,
@@ -80,7 +72,7 @@ func newTaskKeyAllocator(
 	}
 }
 
-func (a *taskKeyAllocatorImpl) allocate(
+func (a *taskKeyAllocator) allocate(
 	taskMaps ...map[tasks.Category][]tasks.Task,
 ) error {
 	now := a.timeSource.Now()
@@ -127,7 +119,7 @@ func (a *taskKeyAllocatorImpl) allocate(
 	return nil
 }
 
-func (a *taskKeyAllocatorImpl) peekNextTaskKey(
+func (a *taskKeyAllocator) peekNextTaskKey(
 	category tasks.Category,
 ) tasks.Key {
 	switch category.Type() {
@@ -150,7 +142,7 @@ func (a *taskKeyAllocatorImpl) peekNextTaskKey(
 	}
 }
 
-func (a *taskKeyAllocatorImpl) generateTaskKey(
+func (a *taskKeyAllocator) generateTaskKey(
 	category tasks.Category,
 ) (tasks.Key, error) {
 	id, err := a.generateTaskID()
@@ -168,7 +160,7 @@ func (a *taskKeyAllocatorImpl) generateTaskKey(
 	}
 }
 
-func (a *taskKeyAllocatorImpl) setRangeID(rangeID int64) {
+func (a *taskKeyAllocator) setRangeID(rangeID int64) {
 	a.nextTaskID = rangeID << a.rangeSizeBits
 	a.exclusiveMaxTaskID = (rangeID + 1) << a.rangeSizeBits
 
@@ -178,7 +170,7 @@ func (a *taskKeyAllocatorImpl) setRangeID(rangeID int64) {
 	)
 }
 
-func (a *taskKeyAllocatorImpl) setTaskMinScheduledTime(
+func (a *taskKeyAllocator) setTaskMinScheduledTime(
 	taskMinScheduledTime time.Time,
 ) {
 	a.taskMinScheduledTime = util.MaxTime(
@@ -187,7 +179,7 @@ func (a *taskKeyAllocatorImpl) setTaskMinScheduledTime(
 	)
 }
 
-func (a *taskKeyAllocatorImpl) generateTaskID() (int64, error) {
+func (a *taskKeyAllocator) generateTaskID() (int64, error) {
 	if a.nextTaskID == a.exclusiveMaxTaskID {
 		if err := a.renewRangeIDFn(); err != nil {
 			return -1, err
