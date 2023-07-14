@@ -53,7 +53,7 @@ const (
 )
 
 type clientImpl struct {
-	connections     *clientConnections
+	connections     connections
 	logger          log.Logger
 	numberOfShards  int32
 	redirector      redirector
