@@ -35,33 +35,18 @@ import (
 )
 
 const (
-	// StoreTypeUnspecified refers to unspecified storage as persistence store
-	StoreTypeUnspecified = "unspecified"
 	// StoreTypeSQL refers to sql based storage as persistence store
 	StoreTypeSQL = "sql"
-	// StoreTypeCassandra refers to nosql based storage as persistence store
-	StoreTypeCassandra = "cassandra"
-	// StoreTypeCustom refers to custom based storage as persistence store
-	StoreTypeCustom = "custom"
-	// StoreTypeElasticsearch refers to elasticsearch based storage as persistence store
-	StoreTypeElasticsearch = "elasticsearch"
+	// StoreTypeNoSQL refers to nosql based storage as persistence store
+	StoreTypeNoSQL = "nosql"
 )
 
 // DefaultStoreType returns the storeType for the default persistence store
 func (c *Persistence) DefaultStoreType() string {
-	if c.DataStores[c.DefaultStore].Cassandra != nil {
-		return StoreTypeCassandra
-	}
 	if c.DataStores[c.DefaultStore].SQL != nil {
 		return StoreTypeSQL
 	}
-	if c.DataStores[c.DefaultStore].CustomDataStoreConfig != nil {
-		return StoreTypeCustom
-	}
-	if c.DataStores[c.DefaultStore].Elasticsearch != nil {
-		return StoreTypeElasticsearch
-	}
-	return StoreTypeUnspecified
+	return StoreTypeNoSQL
 }
 
 // Validate validates the persistence config

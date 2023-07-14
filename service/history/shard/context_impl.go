@@ -1938,7 +1938,7 @@ func newContext(
 	lifecycleCtx, lifecycleCancel := context.WithCancel(context.Background())
 
 	ioConcurrency := historyConfig.AcquireShardConcurrency()
-	if persistenceConfig.DefaultStoreType() == config.StoreTypeCassandra {
+	if persistenceConfig.DataStores[persistenceConfig.DefaultStore].Cassandra != nil {
 		ioConcurrency = 1
 	}
 
