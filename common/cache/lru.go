@@ -33,7 +33,9 @@ import (
 
 var (
 	// ErrCacheFull is returned if Put fails due to cache being filled with pinned elements
-	ErrCacheFull = errors.New("Cache capacity is fully occupied with pinned elements")
+	ErrCacheFull = errors.New("cache capacity is fully occupied with pinned elements")
+	// ErrItemTooBig is returned if Put fails due to item size being bigger than cache capacity
+	ErrItemTooBig = errors.New("new put item size is bigger than cache capacity")
 )
 
 // lru is a concurrent fixed size cache that evicts elements in lru order
@@ -43,6 +45,7 @@ type (
 		byAccess *list.List
 		byKey    map[interface{}]*list.Element
 		maxSize  int
+		currSize int
 		ttl      time.Duration
 		pin      bool
 	}
@@ -58,6 +61,7 @@ type (
 		createTime time.Time
 		value      interface{}
 		refCount   int
+		size       int
 	}
 )
 
@@ -83,6 +87,7 @@ func (it *iteratorImpl) Next() Entry {
 	entry = &entryImpl{
 		key:        entry.key,
 		value:      entry.value,
+		size:       entry.size,
 		createTime: entry.createTime,
 	}
 	it.prepareNext()
@@ -124,6 +129,10 @@ func (entry *entryImpl) Value() interface{} {
 	return entry.value
 }
 
+func (entry *entryImpl) Size() int {
+	return entry.size
+}
+
 func (entry *entryImpl) CreateTime() time.Time {
 	return entry.createTime
 }
@@ -139,6 +148,7 @@ func New(maxSize int, opts *Options) Cache {
 		byKey:    make(map[interface{}]*list.Element, opts.InitialCapacity),
 		ttl:      opts.TTL,
 		maxSize:  maxSize,
+		currSize: 0,
 		pin:      opts.Pin,
 	}
 }
@@ -239,12 +249,12 @@ func (c *lru) Release(key interface{}) {
 	entry.refCount--
 }
 
-// Size returns the number of entries currently in the lru, useful if cache is not full
+// Size returns the current size of the lru, useful if cache is not full
 func (c *lru) Size() int {
 	c.mut.Lock()
 	defer c.mut.Unlock()
 
-	return len(c.byKey)
+	return c.currSize
 }
 
 // Put puts a new value associated with a given key, returning the existing value (if present)
@@ -253,6 +263,12 @@ func (c *lru) putInternal(key interface{}, value interface{}, allowUpdate bool) 
 	if c.maxSize == 0 {
 		return nil, nil
 	}
+
+	size := getSize(value)
+	if size > c.maxSize {
+		return nil, ErrItemTooBig
+	}
+
 	c.mut.Lock()
 	defer c.mut.Unlock()
 
@@ -282,6 +298,7 @@ func (c *lru) putInternal(key interface{}, value interface{}, allowUpdate bool) 
 	entry := &entryImpl{
 		key:   key,
 		value: value,
+		size:  size,
 	}
 
 	if c.pin {
@@ -292,20 +309,22 @@ func (c *lru) putInternal(key interface{}, value interface{}, allowUpdate bool) 
 		entry.createTime = time.Now().UTC()
 	}
 
-	if len(c.byKey) >= c.maxSize {
+	if c.currSize >= c.maxSize {
 		c.evictOnceInternal()
 	}
-	if len(c.byKey) >= c.maxSize {
+	if c.currSize >= c.maxSize {
 		return nil, ErrCacheFull
 	}
 
 	element := c.byAccess.PushFront(entry)
 	c.byKey[key] = element
+	c.currSize += entry.Size()
 	return nil, nil
 }
 
 func (c *lru) deleteInternal(element *list.Element) {
 	entry := c.byAccess.Remove(element).(*entryImpl)
+	c.currSize -= entry.Size()
 	delete(c.byKey, entry.key)
 }
 
