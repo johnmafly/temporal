@@ -169,7 +169,7 @@ func NewTestBase(options *TestBaseOptions) TestBase {
 	switch options.StoreType {
 	case config.StoreTypeSQL:
 		return NewTestBaseWithSQL(options)
-	case config.StoreTypeNoSQL:
+	case config.StoreTypeCassandra:
 		return NewTestBaseWithCassandra(options)
 	default:
 		panic("invalid storeType " + options.StoreType)

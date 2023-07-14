@@ -94,7 +94,7 @@ func (s *scannerTestSuite) TestScannerEnabled() {
 			TaskQueueScannerEnabled:  false,
 			HistoryScannerEnabled:    false,
 			BuildIdScavengerEnabled:  false,
-			DefaultStore:             config.StoreTypeNoSQL,
+			DefaultStore:             config.StoreTypeCassandra,
 			ExpectedScanners:         []expectedScanner{},
 		},
 		{
@@ -112,7 +112,7 @@ func (s *scannerTestSuite) TestScannerEnabled() {
 			TaskQueueScannerEnabled:  false,
 			HistoryScannerEnabled:    true,
 			BuildIdScavengerEnabled:  false,
-			DefaultStore:             config.StoreTypeNoSQL,
+			DefaultStore:             config.StoreTypeCassandra,
 			ExpectedScanners:         []expectedScanner{historyScanner},
 		},
 		{
@@ -130,7 +130,7 @@ func (s *scannerTestSuite) TestScannerEnabled() {
 			TaskQueueScannerEnabled:  true,
 			HistoryScannerEnabled:    false,
 			BuildIdScavengerEnabled:  false,
-			DefaultStore:             config.StoreTypeNoSQL,
+			DefaultStore:             config.StoreTypeCassandra,
 			ExpectedScanners:         []expectedScanner{}, // TODO: enable task queue scanner for NoSQL?
 		},
 		{
@@ -148,7 +148,7 @@ func (s *scannerTestSuite) TestScannerEnabled() {
 			TaskQueueScannerEnabled:  false,
 			HistoryScannerEnabled:    false,
 			BuildIdScavengerEnabled:  false,
-			DefaultStore:             config.StoreTypeNoSQL,
+			DefaultStore:             config.StoreTypeCassandra,
 			ExpectedScanners:         []expectedScanner{executionScanner},
 		},
 		{
@@ -166,7 +166,7 @@ func (s *scannerTestSuite) TestScannerEnabled() {
 			TaskQueueScannerEnabled:  false,
 			HistoryScannerEnabled:    false,
 			BuildIdScavengerEnabled:  true,
-			DefaultStore:             config.StoreTypeNoSQL,
+			DefaultStore:             config.StoreTypeCassandra,
 			ExpectedScanners:         []expectedScanner{buildIdScavenger},
 		},
 		{
@@ -208,7 +208,7 @@ func (s *scannerTestSuite) TestScannerEnabled() {
 					Persistence: &config.Persistence{
 						DefaultStore: c.DefaultStore,
 						DataStores: map[string]config.DataStore{
-							config.StoreTypeNoSQL: {},
+							config.StoreTypeCassandra: {},
 							config.StoreTypeSQL: {
 								SQL: &config.SQL{},
 							},
@@ -284,9 +284,9 @@ func (s *scannerTestSuite) TestScannerShutdown() {
 			TaskQueueScannerEnabled:                dynamicconfig.GetBoolPropertyFn(false),
 			BuildIdScavengerEnabled:                dynamicconfig.GetBoolPropertyFn(false),
 			Persistence: &config.Persistence{
-				DefaultStore: config.StoreTypeNoSQL,
+				DefaultStore: config.StoreTypeCassandra,
 				DataStores: map[string]config.DataStore{
-					config.StoreTypeNoSQL: {},
+					config.StoreTypeCassandra: {},
 				},
 			},
 		},

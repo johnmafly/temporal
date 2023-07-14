@@ -146,7 +146,7 @@ func NewCluster(options *TestClusterConfig, logger log.Logger) (*TestCluster, er
 		options.Persistence.DBPort = ops.DBPort
 		options.Persistence.SchemaDir = ops.SchemaDir
 		options.Persistence.ConnectAttributes = ops.ConnectAttributes
-	case config.StoreTypeNoSQL:
+	case config.StoreTypeCassandra:
 		// noop for now
 	default:
 		panic(fmt.Sprintf("unknown store type: %v", options.Persistence.StoreType))

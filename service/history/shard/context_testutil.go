@@ -88,14 +88,11 @@ func NewTestContext(
 		lifecycleCtx:        lifecycleCtx,
 		lifecycleCancel:     lifecycleCancel,
 
-		state:                              contextStateAcquired,
-		engineFuture:                       future.NewFuture[Engine](),
-		shardInfo:                          shardInfo,
-		taskSequenceNumber:                 shardInfo.RangeId << int64(config.RangeSizeBits),
-		immediateTaskExclusiveMaxReadLevel: shardInfo.RangeId << int64(config.RangeSizeBits),
-		maxTaskSequenceNumber:              (shardInfo.RangeId + 1) << int64(config.RangeSizeBits),
-		remoteClusterInfos:                 make(map[string]*remoteClusterInfo),
-		handoverNamespaces:                 make(map[namespace.Name]*namespaceHandOverInfo),
+		state:              contextStateAcquired,
+		engineFuture:       future.NewFuture[Engine](),
+		shardInfo:          shardInfo,
+		remoteClusterInfos: make(map[string]*remoteClusterInfo),
+		handoverNamespaces: make(map[namespace.Name]*namespaceHandOverInfo),
 
 		clusterMetadata:         resourceTest.ClusterMetadata,
 		timeSource:              resourceTest.TimeSource,
@@ -108,6 +105,14 @@ func NewTestContext(
 		archivalMetadata:        resourceTest.GetArchivalMetadata(),
 		hostInfoProvider:        hostInfoProvider,
 	}
+	shard.taskKeyManager = newTaskKeyManager(
+		shard.timeSource,
+		config,
+		shard.GetLogger(),
+		func() error {
+			return shard.renewRangeLocked(false)
+		},
+	)
 	return &ContextTest{
 		Resource:        resourceTest,
 		ContextImpl:     shard,

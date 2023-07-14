@@ -495,6 +495,8 @@ const (
 	AcquireShardInterval = "history.acquireShardInterval"
 	// AcquireShardConcurrency is number of goroutines that can be used to acquire shards in the shard controller.
 	AcquireShardConcurrency = "history.acquireShardConcurrency"
+	// ShardIOConcurrency controls the concurrency of persistence operations in shard context
+	ShardIOConcurrency = "history.shardIOConcurrency"
 	// StandbyClusterDelay is the artificial delay added to standby cluster's view of active cluster's time
 	StandbyClusterDelay = "history.standbyClusterDelay"
 	// StandbyTaskMissingEventsResendDelay is the amount of time standby cluster's will wait (if events are missing)

@@ -110,8 +110,7 @@ func (s *contextSuite) SetupTest() {
 func (s *contextSuite) TestOverwriteScheduledTaskTimestamp() {
 	now := s.timeSource.Now()
 	s.timeSource.Update(now)
-	maxReadLevel, err := s.mockShard.UpdateScheduledQueueExclusiveHighReadWatermark()
-	s.NoError(err)
+	maxReadLevel := s.mockShard.GetQueueExclusiveHighReadWatermark(tasks.CategoryTimer)
 
 	now = now.Add(time.Minute)
 	s.timeSource.Update(now)
@@ -159,7 +158,7 @@ func (s *contextSuite) TestOverwriteScheduledTaskTimestamp() {
 
 	for _, tc := range testCases {
 		fakeTask.SetVisibilityTime(tc.taskTimestamp)
-		err = s.mockShard.AddTasks(
+		err := s.mockShard.AddTasks(
 			context.Background(),
 			&persistence.AddHistoryTasksRequest{
 				ShardID:     s.mockShard.GetShardID(),
@@ -200,15 +199,15 @@ func (s *contextSuite) TestAddTasks_Success() {
 	s.NoError(err)
 }
 
-func (s *contextSuite) TestTimerMaxReadLevelUpdate() {
-	now := time.Now().Add(time.Minute)
-	s.timeSource.Update(now)
+// func (s *contextSuite) TestTimerMaxReadLevelUpdate() {
+// 	now := time.Now().Add(time.Minute)
+// 	s.timeSource.Update(now)
 
-	_, err := s.mockShard.UpdateScheduledQueueExclusiveHighReadWatermark()
-	s.NoError(err)
+// 	_, err := s.mockShard.UpdateScheduledQueueExclusiveHighReadWatermark()
+// 	s.NoError(err)
 
-	s.True(s.mockShard.scheduledTaskMaxReadLevel.After(now))
-}
+// 	s.True(s.mockShard.scheduledTaskMaxReadLevel.After(now))
+// }
 
 func (s *contextSuite) TestDeleteWorkflowExecution_Success() {
 	workflowKey := definition.WorkflowKey{
@@ -476,7 +475,10 @@ func (s *contextSuite) TestHandoverNamespace() {
 
 	handoverInfo, ok := handoverNS[namespaceEntry.Name().String()]
 	s.True(ok)
-	s.Equal(s.mockShard.immediateTaskExclusiveMaxReadLevel-1, handoverInfo.HandoverReplicationTaskId)
+	s.Equal(
+		s.mockShard.taskKeyManager.getExclusiveReaderHighWatermark(tasks.CategoryReplication).TaskID-1,
+		handoverInfo.HandoverReplicationTaskId,
+	)
 
 	// make shard status invalid
 	// ideally we should use s.mockShard.transition() method
@@ -493,7 +495,10 @@ func (s *contextSuite) TestHandoverNamespace() {
 
 	handoverInfo, ok = handoverNS[namespaceEntry.Name().String()]
 	s.True(ok)
-	s.Equal(s.mockShard.immediateTaskExclusiveMaxReadLevel-1, handoverInfo.HandoverReplicationTaskId)
+	s.Equal(
+		s.mockShard.taskKeyManager.getExclusiveReaderHighWatermark(tasks.CategoryReplication).TaskID-1,
+		handoverInfo.HandoverReplicationTaskId,
+	)
 
 	// delete namespace
 	s.mockShard.UpdateHandoverNamespace(namespaceEntry, true)
