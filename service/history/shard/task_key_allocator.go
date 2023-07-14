@@ -39,7 +39,7 @@ import (
 
 type (
 	taskKeyAllocator interface {
-		allocate(map[tasks.Category][]tasks.Task) error
+		allocate(...map[tasks.Category][]tasks.Task) error
 		peekNextTaskKey(tasks.Category) tasks.Key
 		generateTaskKey(tasks.Category) (tasks.Key, error)
 		setRangeID(int64)
@@ -81,44 +81,46 @@ func newTaskKeyAllocator(
 }
 
 func (a *taskKeyAllocatorImpl) allocate(
-	insertTasks map[tasks.Category][]tasks.Task,
+	taskMaps ...map[tasks.Category][]tasks.Task,
 ) error {
 	now := a.timeSource.Now()
 	a.taskMinScheduledTime = util.MaxTime(a.taskMinScheduledTime, now)
 
-	for category, tasksByCategory := range insertTasks {
-		isScheduledTask := category.Type() == tasks.CategoryTypeScheduled
-		for _, task := range tasksByCategory {
-			id, err := a.generateTaskID()
-			if err != nil {
-				return err
-			}
+	for _, taskMap := range taskMaps {
+		for category, tasksByCategory := range taskMap {
+			isScheduledTask := category.Type() == tasks.CategoryTypeScheduled
+			for _, task := range tasksByCategory {
+				id, err := a.generateTaskID()
+				if err != nil {
+					return err
+				}
 
-			a.logger.Debug("Assigning task ID", tag.TaskID(id))
-			task.SetTaskID(id)
+				a.logger.Debug("Assigning task ID", tag.TaskID(id))
+				task.SetTaskID(id)
 
-			if !isScheduledTask {
-				task.SetVisibilityTime(now)
-				continue
-			}
+				if !isScheduledTask {
+					task.SetVisibilityTime(now)
+					continue
+				}
 
-			taskScheduleTime := task.GetVisibilityTime()
-			if taskScheduleTime.Truncate(persistence.ScheduledTaskMinPrecision).Before(a.taskMinScheduledTime) {
-				a.logger.Debug("New timer generated is less than read level",
-					tag.WorkflowNamespaceID(task.GetNamespaceID()),
-					tag.WorkflowID(task.GetWorkflowID()),
-					tag.WorkflowRunID(task.GetRunID()),
-					tag.Timestamp(taskScheduleTime),
-					tag.CursorTimestamp(a.taskMinScheduledTime),
-					tag.ValueShardAllocateTimerBeforeRead,
+				taskScheduleTime := task.GetVisibilityTime()
+				if taskScheduleTime.Truncate(persistence.ScheduledTaskMinPrecision).Before(a.taskMinScheduledTime) {
+					a.logger.Debug("New timer generated is less than read level",
+						tag.WorkflowNamespaceID(task.GetNamespaceID()),
+						tag.WorkflowID(task.GetWorkflowID()),
+						tag.WorkflowRunID(task.GetRunID()),
+						tag.Timestamp(taskScheduleTime),
+						tag.CursorTimestamp(a.taskMinScheduledTime),
+						tag.ValueShardAllocateTimerBeforeRead,
+					)
+					task.SetVisibilityTime(a.taskMinScheduledTime.Add(persistence.ScheduledTaskMinPrecision))
+				}
+				a.logger.Debug("Assigning new timer",
+					tag.Timestamp(task.GetVisibilityTime()),
+					tag.TaskID(task.GetTaskID()),
+					tag.MaxQueryLevel(a.taskMinScheduledTime),
 				)
-				task.SetVisibilityTime(a.taskMinScheduledTime.Add(persistence.ScheduledTaskMinPrecision))
 			}
-			a.logger.Debug("Assigning new timer",
-				tag.Timestamp(task.GetVisibilityTime()),
-				tag.TaskID(task.GetTaskID()),
-				tag.MaxQueryLevel(a.taskMinScheduledTime),
-			)
 		}
 	}
 

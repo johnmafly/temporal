@@ -35,7 +35,7 @@ import (
 
 type (
 	taskKeyManager interface {
-		allocateTaskKey(map[tasks.Category][]tasks.Task) (taskRequestCompletionFn, error)
+		allocateTaskKey(...map[tasks.Category][]tasks.Task) (taskRequestCompletionFn, error)
 		peekNextTaskKey(tasks.Category) tasks.Key
 		generateTaskKey(tasks.Category) (tasks.Key, error)
 		drainTaskRequests()
@@ -75,14 +75,14 @@ func newTaskKeyManager(
 }
 
 func (m *taskKeyManagerImpl) allocateTaskKey(
-	tasks map[tasks.Category][]tasks.Task,
+	taskMaps ...map[tasks.Category][]tasks.Task,
 ) (taskRequestCompletionFn, error) {
 
-	if err := m.allocator.allocate(tasks); err != nil {
+	if err := m.allocator.allocate(taskMaps...); err != nil {
 		return nil, err
 	}
 
-	return m.tracker.track(tasks), nil
+	return m.tracker.track(taskMaps...), nil
 }
 
 func (m *taskKeyManagerImpl) peekNextTaskKey(

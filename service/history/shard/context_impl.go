@@ -621,25 +621,18 @@ func (s *ContextImpl) UpdateWorkflowExecution(
 		return nil, err
 	}
 
-	mutationRequestCompletionFn, err := s.taskKeyManager.allocateTaskKey(
-		request.UpdateWorkflowMutation.Tasks,
-	)
+	taskMaps := make([]map[tasks.Category][]tasks.Task, 0, 2)
+	taskMaps = append(taskMaps, request.UpdateWorkflowMutation.Tasks)
+	if request.NewWorkflowSnapshot != nil {
+		taskMaps = append(taskMaps, request.NewWorkflowSnapshot.Tasks)
+	}
+	requestCompletionFn, err := s.taskKeyManager.allocateTaskKey(taskMaps...)
 	if err != nil {
 		s.wUnlock()
 		return nil, err
 	}
 	s.updateCloseTaskIDs(request.UpdateWorkflowMutation.ExecutionInfo, request.UpdateWorkflowMutation.Tasks)
-
-	var snapshotRequestCompletionFn taskRequestCompletionFn
 	if request.NewWorkflowSnapshot != nil {
-		snapshotRequestCompletionFn, err = s.taskKeyManager.allocateTaskKey(
-			request.NewWorkflowSnapshot.Tasks,
-		)
-		if err != nil {
-			s.wUnlock()
-			mutationRequestCompletionFn(errRequestNotSent)
-			return nil, err
-		}
 		s.updateCloseTaskIDs(request.NewWorkflowSnapshot.ExecutionInfo, request.NewWorkflowSnapshot.Tasks)
 	}
 
@@ -647,10 +640,7 @@ func (s *ContextImpl) UpdateWorkflowExecution(
 	s.wUnlock()
 
 	resp, err := s.executionManager.UpdateWorkflowExecution(ctx, request)
-	mutationRequestCompletionFn(err)
-	if snapshotRequestCompletionFn != nil {
-		snapshotRequestCompletionFn(err)
-	}
+	requestCompletionFn(err)
 	if err = s.handleWriteError(request.RangeID, err); err != nil {
 		return nil, err
 	}
@@ -708,45 +698,23 @@ func (s *ContextImpl) ConflictResolveWorkflowExecution(
 		return nil, err
 	}
 
-	currentMutationRequestCompletionFn, err := s.taskKeyManager.allocateTaskKey(
-		request.CurrentWorkflowMutation.Tasks,
-	)
-	if err != nil {
-		s.wUnlock()
-		return nil, err
-	}
-
-	resetSnapshotRequestCompletionFn, err := s.taskKeyManager.allocateTaskKey(
-		request.ResetWorkflowSnapshot.Tasks,
-	)
-	if err != nil {
-		s.wUnlock()
-		currentMutationRequestCompletionFn(errRequestNotSent)
-		return nil, err
-	}
-
-	var newSnapshotRequestCompletionFn taskRequestCompletionFn
+	taskMaps := make([]map[tasks.Category][]tasks.Task, 0, 3)
+	taskMaps = append(taskMaps, request.CurrentWorkflowMutation.Tasks, request.ResetWorkflowSnapshot.Tasks)
 	if request.NewWorkflowSnapshot != nil {
-		newSnapshotRequestCompletionFn, err = s.taskKeyManager.allocateTaskKey(
-			request.NewWorkflowSnapshot.Tasks,
-		)
-		if err != nil {
-			s.wUnlock()
-			currentMutationRequestCompletionFn(errRequestNotSent)
-			resetSnapshotRequestCompletionFn(errRequestNotSent)
-			return nil, err
-		}
+		taskMaps = append(taskMaps, request.NewWorkflowSnapshot.Tasks)
+	}
+
+	requestCompletionFn, err := s.taskKeyManager.allocateTaskKey(taskMaps...)
+	if err != nil {
+		s.wUnlock()
+		return nil, err
 	}
 
 	request.RangeID = s.getRangeIDLocked()
 	s.wUnlock()
 
 	resp, err := s.executionManager.ConflictResolveWorkflowExecution(ctx, request)
-	currentMutationRequestCompletionFn(err)
-	resetSnapshotRequestCompletionFn(err)
-	if newSnapshotRequestCompletionFn != nil {
-		newSnapshotRequestCompletionFn(err)
-	}
+	requestCompletionFn(err)
 	if err = s.handleWriteError(request.RangeID, err); err != nil {
 		return nil, err
 	}

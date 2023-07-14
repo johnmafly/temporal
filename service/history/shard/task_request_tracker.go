@@ -34,7 +34,7 @@ type (
 	taskRequestCompletionFn func(error)
 
 	taskRequestTracker interface {
-		track(map[tasks.Category][]tasks.Task) taskRequestCompletionFn
+		track(...map[tasks.Category][]tasks.Task) taskRequestCompletionFn
 		minTaskKey(tasks.Category) (tasks.Key, bool)
 		drain()
 		clear()
@@ -43,42 +43,56 @@ type (
 	taskRequestTrackerImpl struct {
 		sync.Mutex
 
-		// TODO: use a priority queue to track the min pending task key
-		outstandingTaskKeys map[tasks.Category][]tasks.Key
-		outstandingRequests map[int64]struct{}
-		waitChannels        []chan<- struct{}
-
-		nextRequestID int64
+		// using priority queue to track the min pending task key
+		// might be an overkill since the max length of the nested map
+		// is equal to shardIO concurrency limit which should be small
+		outstandingTaskKeys     map[tasks.Category]map[tasks.Key]struct{}
+		outstandingRequestCount int
+		waitChannels            []chan<- struct{}
 	}
 )
 
 func newTaskRequestTracker() *taskRequestTrackerImpl {
+	outstandingTaskKeys := make(map[tasks.Category]map[tasks.Key]struct{})
+	for _, category := range tasks.GetCategories() {
+		outstandingTaskKeys[category] = make(map[tasks.Key]struct{})
+	}
 	return &taskRequestTrackerImpl{
-		outstandingTaskKeys: make(map[tasks.Category][]tasks.Key),
-		outstandingRequests: make(map[int64]struct{}),
+		outstandingTaskKeys: outstandingTaskKeys,
 		waitChannels:        make([]chan<- struct{}, 0),
-		nextRequestID:       0,
 	}
 }
 
 func (t *taskRequestTrackerImpl) track(
-	insertTasks map[tasks.Category][]tasks.Task,
+	taskMaps ...map[tasks.Category][]tasks.Task,
 ) taskRequestCompletionFn {
 	t.Lock()
 	defer t.Unlock()
 
-	requestID := t.nextRequestID
-	t.nextRequestID++
-	t.outstandingRequests[requestID] = struct{}{}
+	t.outstandingRequestCount++
 
 	minKeyByCategory := make(map[tasks.Category]tasks.Key)
-	for category, tasksPerCategory := range insertTasks {
-		if len(tasksPerCategory) == 0 {
-			continue
+	for _, taskMap := range taskMaps {
+		for category, tasksPerCategory := range taskMap {
+			minKey := tasks.MaximumKey
+			for _, task := range tasksPerCategory {
+				if task.GetKey().CompareTo(minKey) < 0 {
+					minKey = task.GetKey()
+				}
+			}
+			if minKey.CompareTo(tasks.MaximumKey) == 0 {
+				continue
+			}
+
+			if _, ok := minKeyByCategory[category]; !ok {
+				minKeyByCategory[category] = minKey
+			} else {
+				minKeyByCategory[category] = tasks.MinKey(minKeyByCategory[category], minKey)
+			}
 		}
-		minKey := minKeyTask(tasksPerCategory)
-		t.outstandingTaskKeys[category] = append(t.outstandingTaskKeys[category], minKey)
-		minKeyByCategory[category] = minKey
+	}
+	for category, minKey := range minKeyByCategory {
+		t.outstandingTaskKeys[category][minKey] = struct{}{}
 	}
 
 	return func(writeErr error) {
@@ -88,19 +102,13 @@ func (t *taskRequestTrackerImpl) track(
 		if writeErr == nil || !OperationPossiblySucceeded(writeErr) {
 			// we can only remove the task from the pending task list if we are sure it was inserted
 			for category, minKey := range minKeyByCategory {
-				pendingTasksForCategory := t.outstandingTaskKeys[category]
-				for i := range pendingTasksForCategory {
-					if pendingTasksForCategory[i].CompareTo(minKey) == 0 {
-						pendingTasksForCategory = append(pendingTasksForCategory[:i], pendingTasksForCategory[i+1:]...)
-						break
-					}
-				}
+				delete(t.outstandingTaskKeys[category], minKey)
 			}
 		}
 
 		// always mark the request as completed, otherwise rangeID renew will be blocked forever
-		delete(t.outstandingRequests, requestID)
-		if len(t.outstandingRequests) == 0 {
+		t.outstandingRequestCount--
+		if t.outstandingRequestCount == 0 {
 			t.closeWaitChannelsLocked()
 		}
 	}
@@ -117,10 +125,10 @@ func (t *taskRequestTrackerImpl) minTaskKey(
 		return tasks.Key{}, false
 	}
 
-	minKey := pendingTasksForCategory[0]
-	for _, key := range pendingTasksForCategory {
-		if key.CompareTo(minKey) < 0 {
-			minKey = key
+	minKey := tasks.MaximumKey
+	for taskKey := range pendingTasksForCategory {
+		if taskKey.CompareTo(minKey) < 0 {
+			minKey = taskKey
 		}
 	}
 
@@ -130,7 +138,7 @@ func (t *taskRequestTrackerImpl) minTaskKey(
 func (t *taskRequestTrackerImpl) drain() {
 	t.Lock()
 
-	if len(t.outstandingRequests) == 0 {
+	if t.outstandingRequestCount == 0 {
 		t.Unlock()
 		return
 	}
@@ -146,8 +154,10 @@ func (t *taskRequestTrackerImpl) clear() {
 	t.Lock()
 	defer t.Unlock()
 
-	t.outstandingTaskKeys = make(map[tasks.Category][]tasks.Key)
-	t.outstandingRequests = make(map[int64]struct{})
+	for category := range t.outstandingTaskKeys {
+		t.outstandingTaskKeys[category] = make(map[tasks.Key]struct{})
+	}
+	t.outstandingRequestCount = 0
 	t.closeWaitChannelsLocked()
 }
 
@@ -156,15 +166,4 @@ func (t *taskRequestTrackerImpl) closeWaitChannelsLocked() {
 		close(waitCh)
 	}
 	t.waitChannels = nil
-}
-
-// minKeyTask returns the min key of the given tasks
-func minKeyTask(t []tasks.Task) tasks.Key {
-	minKey := tasks.MaximumKey
-	for _, task := range t {
-		if task.GetKey().CompareTo(minKey) < 0 {
-			minKey = task.GetKey()
-		}
-	}
-	return minKey
 }
