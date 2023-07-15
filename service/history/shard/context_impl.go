@@ -699,7 +699,10 @@ func (s *ContextImpl) ConflictResolveWorkflowExecution(
 	}
 
 	taskMaps := make([]map[tasks.Category][]tasks.Task, 0, 3)
-	taskMaps = append(taskMaps, request.CurrentWorkflowMutation.Tasks, request.ResetWorkflowSnapshot.Tasks)
+	if request.CurrentWorkflowMutation != nil {
+		taskMaps = append(taskMaps, request.CurrentWorkflowMutation.Tasks)
+	}
+	taskMaps = append(taskMaps, request.ResetWorkflowSnapshot.Tasks)
 	if request.NewWorkflowSnapshot != nil {
 		taskMaps = append(taskMaps, request.NewWorkflowSnapshot.Tasks)
 	}

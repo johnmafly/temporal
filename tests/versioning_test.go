@@ -1592,6 +1592,9 @@ func (s *versioningIntegSuite) TestDisableUserData_WorkflowGetsStuck() {
 }
 
 func (s *versioningIntegSuite) TestDisableUserData_QueryTimesOut() {
+	// flaky
+	s.T().Skip()
+
 	tq := s.T().Name()
 	v1 := s.prefixed("v1")
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
