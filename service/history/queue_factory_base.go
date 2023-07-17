@@ -29,7 +29,6 @@ import (
 
 	"go.uber.org/fx"
 
-	"go.temporal.io/server/common/archiver"
 	"go.temporal.io/server/common/clock"
 	"go.temporal.io/server/common/cluster"
 	"go.temporal.io/server/common/dynamicconfig"
@@ -40,7 +39,6 @@ import (
 	"go.temporal.io/server/service/history/configs"
 	"go.temporal.io/server/service/history/queues"
 	"go.temporal.io/server/service/history/shard"
-	"go.temporal.io/server/service/history/tasks"
 	wcache "go.temporal.io/server/service/history/workflow/cache"
 )
 
@@ -106,7 +104,10 @@ var QueueModule = fx.Options(
 			Group:  QueueFactoryFxGroup,
 			Target: NewMemoryScheduledQueueFactory,
 		},
-		getOptionalQueueFactories,
+		fx.Annotated{
+			Group:  QueueFactoryFxGroup,
+			Target: NewArchivalQueueFactory,
+		},
 	),
 	fx.Invoke(QueueFactoryLifetimeHooks),
 )
@@ -126,30 +127,6 @@ type additionalQueueFactories struct {
 
 	// Factories is a list of queue factories that will be added to the `group:"queueFactory"` group.
 	Factories []QueueFactory `group:"queueFactory,flatten"`
-}
-
-// getOptionalQueueFactories returns an additionalQueueFactories which contains a list of queue factories that will be
-// added to the `group:"queueFactory"` group. The factories are added to the group only if they are enabled, which
-// is why we must return a list here.
-func getOptionalQueueFactories(
-	archivalMetadata archiver.ArchivalMetadata,
-	params ArchivalQueueFactoryParams,
-) additionalQueueFactories {
-
-	c := tasks.CategoryArchival
-	// Removing this category will only affect tests because this method is only called once in production,
-	// but it may be called many times across test runs, which would leave the archival queue as a dangling category
-	tasks.RemoveCategory(c.ID())
-	if archivalMetadata.GetHistoryConfig().StaticClusterState() != archiver.ArchivalEnabled &&
-		archivalMetadata.GetVisibilityConfig().StaticClusterState() != archiver.ArchivalEnabled {
-		return additionalQueueFactories{}
-	}
-	tasks.NewCategory(c.ID(), c.Type(), c.Name())
-	return additionalQueueFactories{
-		Factories: []QueueFactory{
-			NewArchivalQueueFactory(params),
-		},
-	}
 }
 
 func QueueSchedulerRateLimiterProvider(

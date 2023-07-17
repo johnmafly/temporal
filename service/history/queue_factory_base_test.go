@@ -34,7 +34,6 @@ import (
 
 	"go.temporal.io/server/api/historyservice/v1"
 	"go.temporal.io/server/client"
-	carchiver "go.temporal.io/server/common/archiver"
 	"go.temporal.io/server/common/clock"
 	"go.temporal.io/server/common/cluster"
 	"go.temporal.io/server/common/dynamicconfig"
@@ -51,53 +50,9 @@ import (
 	"go.temporal.io/server/service/worker/archiver"
 )
 
-// TestQueueModule_ArchivalQueueCreated tests that the archival queue is created if and only if the static config for
-// either history or visibility archival is enabled.
-func TestQueueModule_ArchivalQueue(t *testing.T) {
-	for _, c := range []moduleTestCase{
-		{
-			Name:                "Archival completely disabled",
-			HistoryState:        carchiver.ArchivalDisabled,
-			VisibilityState:     carchiver.ArchivalDisabled,
-			ExpectArchivalQueue: false,
-		},
-		{
-			Name:                "History archival enabled",
-			HistoryState:        carchiver.ArchivalEnabled,
-			VisibilityState:     carchiver.ArchivalDisabled,
-			ExpectArchivalQueue: true,
-		},
-		{
-			Name:                "Visibility archival enabled",
-			HistoryState:        carchiver.ArchivalDisabled,
-			VisibilityState:     carchiver.ArchivalEnabled,
-			ExpectArchivalQueue: true,
-		},
-		{
-			Name:                "Both history and visibility archival enabled",
-			HistoryState:        carchiver.ArchivalEnabled,
-			VisibilityState:     carchiver.ArchivalEnabled,
-			ExpectArchivalQueue: true,
-		},
-	} {
-		c := c
-		t.Run(c.Name, c.Run)
-	}
-}
-
-// moduleTestCase is a test case for the QueueModule.
-type moduleTestCase struct {
-	Name                string
-	HistoryState        carchiver.ArchivalState
-	VisibilityState     carchiver.ArchivalState
-	ExpectArchivalQueue bool
-}
-
-// Run runs the test case.
-func (c *moduleTestCase) Run(t *testing.T) {
-
+func TestQueueModule(t *testing.T) {
 	controller := gomock.NewController(t)
-	dependencies := getModuleDependencies(controller, c)
+	dependencies := getModuleDependencies(controller)
 	var factories []QueueFactory
 
 	app := fx.New(
@@ -135,38 +90,34 @@ func (c *moduleTestCase) Run(t *testing.T) {
 	require.NotNil(t, txq)
 	require.NotNil(t, tiq)
 	require.NotNil(t, viq)
-	if c.ExpectArchivalQueue {
-		require.NotNil(t, aq)
-		assert.Contains(t, tasks.GetCategories(), tasks.CategoryIDArchival)
-	} else {
-		require.Nil(t, aq)
-		assert.NotContains(t, tasks.GetCategories(), tasks.CategoryIDArchival)
-	}
+	require.NotNil(t, aq)
+	assert.Contains(t, tasks.GetCategories(), tasks.CategoryIDTransfer)
+	assert.Contains(t, tasks.GetCategories(), tasks.CategoryIDTimer)
+	assert.Contains(t, tasks.GetCategories(), tasks.CategoryIDVisibility)
+	assert.Contains(t, tasks.GetCategories(), tasks.CategoryIDArchival)
 }
 
 // getModuleDependencies returns an fx.Option that provides all the dependencies needed for the queue module.
-func getModuleDependencies(controller *gomock.Controller, c *moduleTestCase) fx.Option {
+func getModuleDependencies(controller *gomock.Controller) fx.Option {
 	cfg := configs.NewConfig(
 		dynamicconfig.NewNoopCollection(),
 		1,
 		true,
 		false,
 	)
-	archivalMetadata := getArchivalMetadata(controller, c)
 	clusterMetadata := cluster.NewMockMetadata(controller)
 	clusterMetadata.EXPECT().GetCurrentClusterName().Return("module-test-cluster-name").AnyTimes()
 	return fx.Supply(
-		compileTimeDependencies{},
+		unusedDeps{},
 		cfg,
-		fx.Annotate(archivalMetadata, fx.As(new(carchiver.ArchivalMetadata))),
 		fx.Annotate(metrics.NoopMetricsHandler, fx.As(new(metrics.Handler))),
 		fx.Annotate(clusterMetadata, fx.As(new(cluster.Metadata))),
 	)
 }
 
-// compileTimeDependencies is a struct that provides nil implementations of all the dependencies needed for the queue
+// unusedDeps is a struct that provides nil implementations of all the dependencies needed for the queue
 // module that are not required for the test at runtime.
-type compileTimeDependencies struct {
+type unusedDeps struct {
 	fx.Out
 
 	namespace.Registry
@@ -180,17 +131,4 @@ type compileTimeDependencies struct {
 	manager.VisibilityManager
 	archival.Archiver
 	workflow.RelocatableAttributesFetcher
-}
-
-// getArchivalMetadata returns a mock ArchivalMetadata that contains the static archival config specified in the given
-// test case.
-func getArchivalMetadata(controller *gomock.Controller, c *moduleTestCase) *carchiver.MockArchivalMetadata {
-	archivalMetadata := carchiver.NewMockArchivalMetadata(controller)
-	historyConfig := carchiver.NewMockArchivalConfig(controller)
-	visibilityConfig := carchiver.NewMockArchivalConfig(controller)
-	historyConfig.EXPECT().StaticClusterState().Return(c.HistoryState).AnyTimes()
-	visibilityConfig.EXPECT().StaticClusterState().Return(c.VisibilityState).AnyTimes()
-	archivalMetadata.EXPECT().GetHistoryConfig().Return(historyConfig).AnyTimes()
-	archivalMetadata.EXPECT().GetVisibilityConfig().Return(visibilityConfig).AnyTimes()
-	return archivalMetadata
 }

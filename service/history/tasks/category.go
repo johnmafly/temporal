@@ -118,6 +118,7 @@ var (
 			CategoryVisibility.ID():  CategoryVisibility,
 			CategoryReplication.ID(): CategoryReplication,
 			CategoryMemoryTimer.ID(): CategoryMemoryTimer,
+			CategoryArchival.ID():    CategoryArchival,
 		},
 	}
 )
@@ -152,14 +153,6 @@ func GetCategories() map[int32]Category {
 	categories.RLock()
 	defer categories.RUnlock()
 	return maps.Clone(categories.m)
-}
-
-// RemoveCategory removes a registered Category.
-// This should only be used for testing.
-func RemoveCategory(id int32) {
-	categories.Lock()
-	defer categories.Unlock()
-	delete(categories.m, id)
 }
 
 // GetCategoryByID returns a registered Category with the same ID
