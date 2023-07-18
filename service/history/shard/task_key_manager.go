@@ -29,6 +29,7 @@ import (
 
 	"go.temporal.io/server/common/clock"
 	"go.temporal.io/server/common/log"
+	"go.temporal.io/server/common/log/tag"
 	"go.temporal.io/server/service/history/configs"
 	"go.temporal.io/server/service/history/tasks"
 )
@@ -37,6 +38,8 @@ type (
 	taskKeyManager struct {
 		allocator *taskKeyAllocator
 		tracker   *taskRequestTracker
+
+		logger log.Logger
 	}
 )
 
@@ -48,6 +51,7 @@ func newTaskKeyManager(
 ) *taskKeyManager {
 	manager := &taskKeyManager{
 		tracker: newTaskRequestTracker(),
+		logger:  logger,
 	}
 	manager.allocator = newTaskKeyAllocator(
 		config.RangeSizeBits,
@@ -120,6 +124,14 @@ func (m *taskKeyManager) getExclusiveReaderHighWatermark(
 	if category.Type() == tasks.CategoryTypeScheduled {
 		exclusiveReaderHighWatermark.TaskID = 0
 	}
+
+	m.logger.Debug("ExclusiveReaderHighWatermark",
+		tag.NewStringTag("task-category", category.Name()),
+		tag.TaskID(exclusiveReaderHighWatermark.TaskID),
+		tag.TaskVisibilityTimestamp(exclusiveReaderHighWatermark.FireTime),
+		tag.NewInt64("min-task-id", minTaskKey.TaskID),
+		tag.NewTimeTag("min-task-visibility-timestamp", minTaskKey.FireTime),
+	)
 
 	return exclusiveReaderHighWatermark
 }
