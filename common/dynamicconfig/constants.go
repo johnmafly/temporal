@@ -506,6 +506,9 @@ const (
 	ShardLingerOwnershipCheckQPS = "history.shardLingerOwnershipCheckQPS"
 	// ShardLingerTimeLimit is the upper bound on how long a shard can linger.
 	ShardLingerTimeLimit = "history.shardLingerTimeLimit"
+	// HistoryClientCachingRedirectorEnabled configures if history clients try to cache
+	// shard ownership information, instead of checking membership for each request.
+	HistoryClientCachingRedirectorEnabled = "history.clientCachingRedirectorEnabled"
 	// StandbyClusterDelay is the artificial delay added to standby cluster's view of active cluster's time
 	StandbyClusterDelay = "history.standbyClusterDelay"
 	// StandbyTaskMissingEventsResendDelay is the amount of time standby cluster's will wait (if events are missing)

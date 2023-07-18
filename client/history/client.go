@@ -40,6 +40,7 @@ import (
 	replicationspb "go.temporal.io/server/api/replication/v1"
 	"go.temporal.io/server/common"
 	"go.temporal.io/server/common/debug"
+	"go.temporal.io/server/common/dynamicconfig"
 	"go.temporal.io/server/common/log"
 	"go.temporal.io/server/common/log/tag"
 	"go.temporal.io/server/common/membership"
@@ -63,6 +64,7 @@ type clientImpl struct {
 
 // NewClient creates a new history service gRPC client
 func NewClient(
+	dc *dynamicconfig.Collection,
 	historyServiceResolver membership.ServiceResolver,
 	logger log.Logger,
 	numberOfShards int32,
@@ -70,11 +72,19 @@ func NewClient(
 	timeout time.Duration,
 ) historyservice.HistoryServiceClient {
 	connections := newConnections(historyServiceResolver, rpcFactory)
+
+	var redirector redirector
+	if dc.GetBoolProperty(dynamicconfig.HistoryClientCachingRedirectorEnabled, false)() {
+		redirector = newCachingRedirector(connections, historyServiceResolver)
+	} else {
+		redirector = newBasicRedirector(connections, historyServiceResolver)
+	}
+
 	return &clientImpl{
 		connections:     connections,
 		logger:          logger,
 		numberOfShards:  numberOfShards,
-		redirector:      newBasicRedirector(connections, historyServiceResolver),
+		redirector:      redirector,
 		timeout:         timeout,
 		tokenSerializer: common.NewProtoTaskTokenSerializer(),
 	}
