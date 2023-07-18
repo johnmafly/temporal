@@ -645,7 +645,7 @@ func (a *activities) verifyReplicationTasks(
 			return false, progress, nil
 
 		default:
-			return false, progress, err
+			return false, progress, fmt.Errorf("remoteClient.DescribeMutableState failed. error: %v", err)
 		}
 	}
 
