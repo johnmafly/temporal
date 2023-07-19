@@ -1660,6 +1660,7 @@ var (
 	CreateReplicationTasksLatency = NewTimerDef("create_replication_tasks_latency")
 	VerifyReplicationTaskSuccess  = NewCounterDef("verify_replication_task_success")
 	VerifyReplicationTaskNotFound = NewCounterDef("verify_replication_task_not_found")
+	VerifyReplicationTaskFailed   = NewCounterDef("verify_replication_task_failed")
 	VerifyReplicationTasksLatency = NewTimerDef("verify_replication_tasks_latency")
 
 	// Replication

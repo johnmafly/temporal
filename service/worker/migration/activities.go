@@ -654,6 +654,8 @@ func (a *activities) verifyReplicationTasks(
 			return false, progress, nil
 
 		default:
+			a.forceReplicationMetricsHandler.WithTags(metrics.NamespaceTag(request.Namespace), metrics.ServiceErrorTypeTag(err)).
+				Counter(metrics.VerifyReplicationTaskFailed.GetMetricName()).Record(1)
 			return false, progress, errors.WithMessage(err, "remoteClient.DescribeMutableState call failed")
 		}
 	}
