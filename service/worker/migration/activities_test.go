@@ -145,7 +145,7 @@ func (s *activitiesSuite) initEnv() (*testsuite.TestActivityEnvironment, *heartb
 func (s *activitiesSuite) TestGenerateAndVerifyReplicationTasks_Success() {
 	env, iceptor := s.initEnv()
 
-	request := genearteAndVerifyReplicationTasksRequest{
+	request := verifyReplicationTasksRequest{
 		Namespace:             mockedNamespace,
 		NamespaceID:           mockedNamespaceID,
 		RPS:                   10,
@@ -196,7 +196,7 @@ func (s *activitiesSuite) TestGenerateAndVerifyReplicationTasks_Success() {
 		}).Return(r.resp, r.err).Times(1)
 	}
 
-	_, err := env.ExecuteActivity(s.a.GenerateAndVerifyReplicationTasks, &request)
+	_, err := env.ExecuteActivity(s.a.VerifyReplicationTasks, &request)
 	s.NoError(err)
 
 	s.Greater(len(iceptor.replicationRecordedHeartbeats), 0)
@@ -237,13 +237,13 @@ func (s *activitiesSuite) TestGenerateAndVerifyReplicationTasks_Skipped() {
 		},
 		{
 			nil, mockErr,
-			NOT_CREATED,
+			NOT_VERIFIED,
 			"",
 			mockErr,
 		},
 	}
 
-	request := genearteAndVerifyReplicationTasksRequest{
+	request := verifyReplicationTasksRequest{
 		Namespace:             mockedNamespace,
 		NamespaceID:           mockedNamespaceID,
 		RPS:                   10,
@@ -260,7 +260,7 @@ func (s *activitiesSuite) TestGenerateAndVerifyReplicationTasks_Skipped() {
 			Execution:   &execution1,
 		}).Return(t.resp, t.err)
 
-		_, err := env.ExecuteActivity(s.a.GenerateAndVerifyReplicationTasks, &request)
+		_, err := env.ExecuteActivity(s.a.VerifyReplicationTasks, &request)
 		if t.expectedErr == nil {
 			s.NoError(err)
 		} else {
@@ -281,7 +281,7 @@ func (s *activitiesSuite) TestGenerateAndVerifyReplicationTasks_Skipped() {
 
 func (s *activitiesSuite) TestGenerateAndVerifyReplicationTasks_Failed() {
 	env, iceptor := s.initEnv()
-	request := genearteAndVerifyReplicationTasksRequest{
+	request := verifyReplicationTasksRequest{
 		Namespace:             mockedNamespace,
 		NamespaceID:           mockedNamespaceID,
 		RPS:                   10,
@@ -321,7 +321,7 @@ func (s *activitiesSuite) TestGenerateAndVerifyReplicationTasks_Failed() {
 		CheckPoint: time.Now().Add(-defaultNoProgressNotRetryableTimeout),
 	})
 
-	_, err := env.ExecuteActivity(s.a.GenerateAndVerifyReplicationTasks, &request)
+	_, err := env.ExecuteActivity(s.a.VerifyReplicationTasks, &request)
 	s.Error(err)
 	s.ErrorContains(err, "verifyReplicationTasks was not able to make progress")
 
@@ -335,7 +335,7 @@ func (s *activitiesSuite) TestGenerateAndVerifyReplicationTasks_Failed() {
 
 func (s *activitiesSuite) TestGenerateAndVerifyReplicationTasks_Skipped2() {
 	env, iceptor := s.initEnv()
-	request := genearteAndVerifyReplicationTasksRequest{
+	request := verifyReplicationTasksRequest{
 		Namespace:             mockedNamespace,
 		NamespaceID:           mockedNamespaceID,
 		RPS:                   10,
@@ -351,7 +351,7 @@ func (s *activitiesSuite) TestGenerateAndVerifyReplicationTasks_Skipped2() {
 		CheckPoint: time.Now(),
 	})
 
-	_, err := env.ExecuteActivity(s.a.GenerateAndVerifyReplicationTasks, &request)
+	_, err := env.ExecuteActivity(s.a.VerifyReplicationTasks, &request)
 	s.NoError(err)
 
 	s.Greater(len(iceptor.replicationRecordedHeartbeats), 0)
@@ -360,4 +360,11 @@ func (s *activitiesSuite) TestGenerateAndVerifyReplicationTasks_Skipped2() {
 	for _, r := range lastHeartBeat.Results {
 		s.True(r.isVerified())
 	}
+}
+
+func (s *activitiesSuite) Test_isNotFoundServiceError() {
+	s.True(isNotFoundServiceError(serviceerror.NewNotFound("")))
+	var err error
+	s.False(isNotFoundServiceError(err))
+	s.False(isNotFoundServiceError(serviceerror.NewInternal("")))
 }
