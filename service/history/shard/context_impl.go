@@ -2102,13 +2102,7 @@ func (s *ContextImpl) newShardClosedErrorWithShardID() *persistence.ShardOwnersh
 	}
 }
 
-var errRequestNotSent = errors.New("request not sent")
-
 func OperationPossiblySucceeded(err error) bool {
-	if errors.Is(err, errRequestNotSent) {
-		return false
-	}
-
 	switch err.(type) {
 	case *persistence.CurrentWorkflowConditionFailedError,
 		*persistence.WorkflowConditionFailedError,

@@ -519,7 +519,7 @@ func TestArchivalQueueTaskExecutor(t *testing.T) {
 				timeSource,
 				namespaceRegistry,
 				mockMetadata,
-				nil,
+				logger,
 				metrics.NoopMetricsHandler,
 			)
 			err := executable.Execute()

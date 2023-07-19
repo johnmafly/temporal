@@ -113,6 +113,7 @@ func (a *taskKeyAllocator) allocate(
 					task.SetVisibilityTime(a.taskMinScheduledTime.Add(persistence.ScheduledTaskMinPrecision))
 				}
 				a.logger.Debug("Assigning new timer",
+					tag.CursorTimestamp(time.Now().Add(time.Nanosecond)),
 					tag.Timestamp(task.GetVisibilityTime()),
 					tag.TaskID(task.GetTaskID()),
 					tag.MaxQueryLevel(a.taskMinScheduledTime),
@@ -138,7 +139,6 @@ func (a *taskKeyAllocator) peekNextTaskKey(
 		// in case existing code can't work correctly with precision higher than 1ms.
 		// Once we validate the rest of the code can worker correctly with higher precision, the truncation should be removed.
 
-		// TODO: do this during task allocation as well
 		a.setTaskMinScheduledTime(
 			a.timeSource.Now().
 				Add(a.taskScheduledTimeShift()).

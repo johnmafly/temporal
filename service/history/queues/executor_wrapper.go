@@ -92,6 +92,6 @@ func (e *executorWrapper) isActiveTask(
 		return false
 	}
 
-	e.logger.Debug("Process task as active.", tag.WorkflowNamespaceID(namespaceID), tag.Value(executable.GetTask()))
+	// e.logger.Debug("Process task as active.", tag.WorkflowNamespaceID(namespaceID), tag.Value(executable.GetTask()))
 	return true
 }

@@ -92,20 +92,48 @@ func NewScheduledQueue(
 				NextPageToken:       paginationToken,
 			}
 
+			logger.Debug("GetHistoryTasks",
+				tag.NewStringTag("task-category", category.Name()),
+				tag.MinQueryLevel(request.InclusiveMinTaskKey.FireTime),
+				tag.MaxQueryLevel(request.ExclusiveMaxTaskKey.FireTime),
+			)
 			resp, err := shard.GetExecutionManager().GetHistoryTasks(ctx, request)
 			if err != nil {
 				return nil, nil, err
 			}
 
 			for len(resp.Tasks) > 0 && !r.ContainsKey(resp.Tasks[0].GetKey()) {
+				logger.Debug("Drop out of scope task",
+					tag.NewStringTag("task-category", category.Name()),
+					tag.TaskID(resp.Tasks[0].GetTaskID()),
+					tag.TaskVisibilityTimestamp(resp.Tasks[0].GetVisibilityTime()),
+					tag.MinQueryLevel(request.InclusiveMinTaskKey.FireTime),
+					tag.MaxQueryLevel(request.ExclusiveMaxTaskKey.FireTime),
+				)
 				resp.Tasks = resp.Tasks[1:]
 			}
 
 			for len(resp.Tasks) > 0 && !r.ContainsKey(resp.Tasks[len(resp.Tasks)-1].GetKey()) {
+				logger.Debug("Drop out of scope task",
+					tag.NewStringTag("task-category", category.Name()),
+					tag.TaskID(resp.Tasks[len(resp.Tasks)-1].GetTaskID()),
+					tag.TaskVisibilityTimestamp(resp.Tasks[len(resp.Tasks)-1].GetVisibilityTime()),
+					tag.MinQueryLevel(request.InclusiveMinTaskKey.FireTime),
+					tag.MaxQueryLevel(request.ExclusiveMaxTaskKey.FireTime),
+				)
 				resp.Tasks = resp.Tasks[:len(resp.Tasks)-1]
 				resp.NextPageToken = nil
 			}
 
+			for _, task := range resp.Tasks {
+				logger.Debug("Loaded task",
+					tag.NewStringTag("task-category", category.Name()),
+					tag.TaskID(task.GetTaskID()),
+					tag.TaskVisibilityTimestamp(task.GetVisibilityTime()),
+					tag.MinQueryLevel(request.InclusiveMinTaskKey.FireTime),
+					tag.MaxQueryLevel(request.ExclusiveMaxTaskKey.FireTime),
+				)
+			}
 			return resp.Tasks, resp.NextPageToken, nil
 		}
 	}
