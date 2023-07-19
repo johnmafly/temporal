@@ -334,36 +334,28 @@ func (s *ContextImpl) SetQueueState(
 	category tasks.Category,
 	state *persistencespb.QueueState,
 ) error {
-	s.wLock()
-	defer s.wUnlock()
-
-	categoryID := category.ID()
-	s.shardInfo.QueueStates[categoryID] = state
-
-	s.shardInfo.StolenSinceRenew = 0
-	return s.updateShardInfoLocked()
+	return s.updateShardInfo(func() {
+		categoryID := category.ID()
+		s.shardInfo.QueueStates[categoryID] = state
+	})
 }
 
 func (s *ContextImpl) UpdateReplicationQueueReaderState(
 	readerID int64,
 	readerState *persistencespb.QueueReaderState,
 ) error {
-	s.wLock()
-	defer s.wUnlock()
-
-	categoryID := tasks.CategoryReplication.ID()
-	queueState, ok := s.shardInfo.QueueStates[categoryID]
-	if !ok {
-		queueState = &persistencespb.QueueState{
-			ExclusiveReaderHighWatermark: nil,
-			ReaderStates:                 make(map[int64]*persistencespb.QueueReaderState),
+	return s.updateShardInfo(func() {
+		categoryID := tasks.CategoryReplication.ID()
+		queueState, ok := s.shardInfo.QueueStates[categoryID]
+		if !ok {
+			queueState = &persistencespb.QueueState{
+				ExclusiveReaderHighWatermark: nil,
+				ReaderStates:                 make(map[int64]*persistencespb.QueueReaderState),
+			}
+			s.shardInfo.QueueStates[categoryID] = queueState
 		}
-		s.shardInfo.QueueStates[categoryID] = queueState
-	}
-	queueState.ReaderStates[readerID] = readerState
-
-	s.shardInfo.StolenSinceRenew = 0
-	return s.updateShardInfoLocked()
+		queueState.ReaderStates[readerID] = readerState
+	})
 }
 
 // UpdateRemoteClusterInfo deprecated
@@ -425,12 +417,9 @@ func (s *ContextImpl) UpdateReplicatorDLQAckLevel(
 	sourceCluster string,
 	ackLevel int64,
 ) error {
-	s.wLock()
-	defer s.wUnlock()
-
-	s.shardInfo.ReplicationDlqAckLevel[sourceCluster] = ackLevel
-	s.shardInfo.StolenSinceRenew = 0
-	if err := s.updateShardInfoLocked(); err != nil {
+	if err := s.updateShardInfo(func() {
+		s.shardInfo.ReplicationDlqAckLevel[sourceCluster] = ackLevel
+	}); err != nil {
 		return err
 	}
 
@@ -1126,11 +1115,6 @@ func (s *ContextImpl) renewRangeLocked(isStealing bool) error {
 		updatedShardInfo.StolenSinceRenew++
 	}
 
-	if err := s.ioSemaphore.Acquire(s.lifecycleCtx, 1); err != nil {
-		return err
-	}
-	defer s.ioSemaphore.Release(1)
-
 	ctx, cancel := s.newIOContext()
 	defer cancel()
 
@@ -1162,21 +1146,30 @@ func (s *ContextImpl) renewRangeLocked(isStealing bool) error {
 	return nil
 }
 
-func (s *ContextImpl) updateShardInfoLocked() error {
-	if err := s.errorByState(); err != nil {
-		return err
-	}
+func (s *ContextImpl) updateShardInfo(
+	updateFnLocked func(),
+) error {
+	s.wLock()
+	updateFnLocked()
+	s.shardInfo.StolenSinceRenew = 0
 
-	var err error
 	now := cclock.NewRealTimeSource().Now()
-	if s.lastUpdated.Add(s.config.ShardUpdateMinInterval()).After(now) {
+	previousLastUpdate := s.lastUpdated
+	persistShardInfo := s.lastUpdated.Add(s.config.ShardUpdateMinInterval()).After(now)
+	s.lastUpdated = now
+
+	if !persistShardInfo {
+		s.wUnlock()
 		return nil
 	}
+
 	updatedShardInfo := trimShardInfo(s.clusterMetadata.GetAllClusterInfo(), copyShardInfo(s.shardInfo))
 	s.emitShardInfoMetricsLogsLocked(updatedShardInfo.QueueStates)
-
-	// TODO: we don't need to hold shard lock here?
-	// NO we don't
+	request := &persistence.UpdateShardRequest{
+		ShardInfo:       updatedShardInfo,
+		PreviousRangeID: s.shardInfo.GetRangeId(),
+	}
+	s.wUnlock()
 
 	if err := s.ioSemaphore.Acquire(s.lifecycleCtx, 1); err != nil {
 		return err
@@ -1185,15 +1178,16 @@ func (s *ContextImpl) updateShardInfoLocked() error {
 
 	ctx, cancel := s.newIOContext()
 	defer cancel()
-	err = s.persistenceShardManager.UpdateShard(ctx, &persistence.UpdateShardRequest{
-		ShardInfo:       updatedShardInfo,
-		PreviousRangeID: s.shardInfo.GetRangeId(),
-	})
+
+	err := s.persistenceShardManager.UpdateShard(ctx, request)
 	if err != nil {
-		return s.handleWriteErrorLocked(s.shardInfo.GetRangeId(), err)
+		s.wLock()
+		defer s.wUnlock()
+		// revert lastUpdated time so that operation can be retried
+		s.lastUpdated = previousLastUpdate
+		return s.handleWriteErrorLocked(request.PreviousRangeID, err)
 	}
 
-	s.lastUpdated = now
 	return nil
 }
 
@@ -1841,9 +1835,13 @@ func (s *ContextImpl) acquireShard() {
 		//   outer function will do nothing, since the state was already changed.
 		// transition(contextRequestLost) for other transient errors:
 		//   This will do nothing, since state is already Acquiring.
+		if err := s.ioSemaphore.Acquire(s.lifecycleCtx, 1); err != nil {
+			return err
+		}
 		s.wLock()
 		err = s.renewRangeLocked(true)
 		s.wUnlock()
+		s.ioSemaphore.Release(1)
 		if err != nil {
 			return err
 		}

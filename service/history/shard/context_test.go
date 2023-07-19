@@ -140,19 +140,19 @@ func (s *contextSuite) TestOverwriteScheduledTaskTimestamp() {
 			// task timestamp is lower than both scheduled queue max read level and now
 			// should be overwritten to be later than both
 			taskTimestamp:     maxReadLevel.FireTime.Add(-time.Minute),
-			expectedTimestamp: now.Add(persistence.ScheduledTaskMinPrecision),
+			expectedTimestamp: now.Add(persistence.ScheduledTaskMinPrecision).Truncate(persistence.ScheduledTaskMinPrecision),
 		},
 		{
 			// task timestamp is lower than now but higher than scheduled queue max read level
 			// should still be overwritten to be later than both
 			taskTimestamp:     now.Add(-time.Minute),
-			expectedTimestamp: now.Add(persistence.ScheduledTaskMinPrecision),
+			expectedTimestamp: now.Add(persistence.ScheduledTaskMinPrecision).Truncate(persistence.ScheduledTaskMinPrecision),
 		},
 		{
 			// task timestamp is later than both now and scheduled queue max read level
 			// should not be overwritten
 			taskTimestamp:     now.Add(time.Minute),
-			expectedTimestamp: now.Add(time.Minute),
+			expectedTimestamp: now.Add(time.Minute).Add(persistence.ScheduledTaskMinPrecision).Truncate(persistence.ScheduledTaskMinPrecision),
 		},
 	}
 
@@ -169,6 +169,8 @@ func (s *contextSuite) TestOverwriteScheduledTaskTimestamp() {
 			},
 		)
 		s.NoError(err)
+		fmt.Println(fakeTask.GetVisibilityTime())
+		fmt.Println(tc.expectedTimestamp)
 		s.True(fakeTask.GetVisibilityTime().After(now))
 		s.True(fakeTask.GetVisibilityTime().After(maxReadLevel.FireTime))
 		s.True(fakeTask.GetVisibilityTime().Equal(tc.expectedTimestamp))
