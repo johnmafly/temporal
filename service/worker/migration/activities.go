@@ -636,11 +636,13 @@ func (a *activities) verifyReplicationTasks(
 			continue
 		}
 
+		s := time.Now()
 		// Check if execution exists on remote cluster
 		_, err := remoteClient.DescribeMutableState(ctx, &adminservice.DescribeMutableStateRequest{
 			Namespace: request.Namespace,
 			Execution: &we,
 		})
+		a.forceReplicationMetricsHandler.Timer(metrics.RemoteDescribeMutableStateLatency.GetMetricName()).Record(time.Since(s))
 
 		switch err.(type) {
 		case nil:
