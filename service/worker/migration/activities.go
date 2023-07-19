@@ -575,7 +575,7 @@ func (a *activities) createReplicationTasks(ctx context.Context, request *genear
 		switch err.(type) {
 		case nil:
 			if resp.GetDatabaseMutableState().GetExecutionState().GetState() == enumsspb.WORKFLOW_EXECUTION_STATE_ZOMBIE {
-				a.forceReplicationMetricsHandler.Counter(metrics.EncounterZombieWorkflowCount.GetMetricName()).Record(1)
+				a.forceReplicationMetricsHandler.WithTags(metrics.NamespaceTag(request.Namespace)).Counter(metrics.EncounterZombieWorkflowCount.GetMetricName()).Record(1)
 				a.logger.Info("createReplicationTasks skip Zombie workflow", tags...)
 
 				r.Status = VERIFY_SKIPPED
@@ -644,11 +644,12 @@ func (a *activities) verifyReplicationTasks(
 
 		switch err.(type) {
 		case nil:
-			a.forceReplicationMetricsHandler.Counter(metrics.VerifyReplicationTaskSuccess.GetMetricName()).Record(1)
+			a.forceReplicationMetricsHandler.WithTags(metrics.NamespaceTag(request.Namespace)).Counter(metrics.VerifyReplicationTaskSuccess.GetMetricName()).Record(1)
 			r.Status = VERIFIED
 			progress = true
 
 		case *serviceerror.NotFound:
+			a.forceReplicationMetricsHandler.WithTags(metrics.NamespaceTag(request.Namespace)).Counter(metrics.VerifyReplicationTaskNotFound.GetMetricName()).Record(1)
 			detail.LastNotFoundWorkflowExecution = we
 			return false, progress, nil
 

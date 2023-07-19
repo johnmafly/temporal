@@ -1659,6 +1659,7 @@ var (
 	EncounterZombieWorkflowCount  = NewCounterDef("encounter_zombie_workflow_count")
 	CreateReplicationTasksLatency = NewTimerDef("create_replication_tasks_latency")
 	VerifyReplicationTaskSuccess  = NewCounterDef("verify_replication_task_success")
+	VerifyReplicationTaskNotFound = NewCounterDef("verify_replication_task_not_found")
 	VerifyReplicationTasksLatency = NewTimerDef("verify_replication_tasks_latency")
 
 	// Replication
