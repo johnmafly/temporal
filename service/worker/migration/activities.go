@@ -642,7 +642,7 @@ func (a *activities) verifyReplicationTasks(
 			Namespace: request.Namespace,
 			Execution: &we,
 		})
-		a.forceReplicationMetricsHandler.Timer(metrics.RemoteDescribeMutableStateLatency.GetMetricName()).Record(time.Since(s))
+		a.forceReplicationMetricsHandler.Timer(metrics.VerifyDescribeMutableStateLatency.GetMetricName()).Record(time.Since(s))
 
 		switch err.(type) {
 		case nil:

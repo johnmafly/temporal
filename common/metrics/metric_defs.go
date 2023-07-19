@@ -1662,7 +1662,7 @@ var (
 	VerifyReplicationTaskNotFound     = NewCounterDef("verify_replication_task_not_found")
 	VerifyReplicationTaskFailed       = NewCounterDef("verify_replication_task_failed")
 	VerifyReplicationTasksLatency     = NewTimerDef("verify_replication_tasks_latency")
-	RemoteDescribeMutableStateLatency = NewTimerDef("DescribeMutableState")
+	VerifyDescribeMutableStateLatency = NewTimerDef("verify_describe_mutable_state_latency")
 
 	// Replication
 	NamespaceReplicationTaskAckLevelGauge = NewGaugeDef("namespace_replication_task_ack_level")
