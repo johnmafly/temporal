@@ -705,10 +705,8 @@ func (a *activities) GenerateAndVerifyReplicationTasks(ctx context.Context, requ
 	//  - more than NonRetryableTimeout, it means potentially we encountered #4. The activity returns
 	//    non-retryable error and force-replication workflow will restarted.
 	for {
-		var verified, progress bool
-		var err error
-
-		if verified, progress, err = a.verifyReplicationTasks(ctx, request, &details, remoteClient); err != nil {
+		verified, progress, err := a.verifyReplicationTasks(ctx, request, &details, remoteClient)
+		if err != nil {
 			return err
 		}
 
