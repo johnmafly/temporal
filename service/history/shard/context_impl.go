@@ -1155,7 +1155,7 @@ func (s *ContextImpl) updateShardInfo(
 
 	now := cclock.NewRealTimeSource().Now()
 	previousLastUpdate := s.lastUpdated
-	persistShardInfo := s.lastUpdated.Add(s.config.ShardUpdateMinInterval()).After(now)
+	persistShardInfo := s.lastUpdated.Add(s.config.ShardUpdateMinInterval()).Before(now)
 	s.lastUpdated = now
 
 	if !persistShardInfo {
