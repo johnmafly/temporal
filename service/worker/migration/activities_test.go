@@ -110,6 +110,7 @@ func (s *activitiesSuite) SetupTest() {
 
 	s.logger = log.NewNoopLogger()
 	s.mockMetricsHandler = metrics.NewMockHandler(s.controller)
+	s.mockMetricsHandler.EXPECT().WithTags(gomock.Any()).Return(s.mockMetricsHandler).AnyTimes()
 	s.mockMetricsHandler.EXPECT().Timer(gomock.Any()).Return(metrics.NoopTimerMetricFunc).AnyTimes()
 	s.mockMetricsHandler.EXPECT().Counter(gomock.Any()).Return(metrics.NoopCounterMetricFunc).AnyTimes()
 	s.mockClientFactory.EXPECT().NewRemoteAdminClientWithTimeout(remoteRpcAddress, gomock.Any(), gomock.Any()).
@@ -275,5 +276,59 @@ func (s *activitiesSuite) TestGenerateAndVerifyReplicationTasks_Skipped() {
 		}
 
 		s.True(lastHeartBeat.CheckPoint.After(start))
+	}
+}
+
+func (s *activitiesSuite) TestGenerateAndVerifyReplicationTasks_Failed() {
+	env, iceptor := s.initEnv()
+	request := genearteAndVerifyReplicationTasksRequest{
+		Namespace:             mockedNamespace,
+		NamespaceID:           mockedNamespaceID,
+		RPS:                   10,
+		TargetClusterEndpoint: remoteRpcAddress,
+		Executions:            []commonpb.WorkflowExecution{execution1},
+	}
+
+	// Setup create replication tasks
+	for i := 0; i < len(request.Executions); i++ {
+		we := request.Executions[i]
+		s.mockHistoryClient.EXPECT().DescribeMutableState(gomock.Any(), &historyservice.DescribeMutableStateRequest{
+			NamespaceId: mockedNamespaceID,
+			Execution:   &we,
+		}).Return(&historyservice.DescribeMutableStateResponse{
+			DatabaseMutableState: &persistencepb.WorkflowMutableState{
+				ExecutionState: &persistencepb.WorkflowExecutionState{
+					State: enumsspb.WORKFLOW_EXECUTION_STATE_COMPLETED,
+				},
+			},
+		}, nil).Times(1)
+
+		s.mockHistoryClient.EXPECT().GenerateLastHistoryReplicationTasks(gomock.Any(), &historyservice.GenerateLastHistoryReplicationTasksRequest{
+			NamespaceId: mockedNamespaceID,
+			Execution:   &we,
+		}).Return(&historyservice.GenerateLastHistoryReplicationTasksResponse{}, nil).Times(1)
+	}
+
+	// Never replicated
+	s.mockRemoteAdminClient.EXPECT().DescribeMutableState(gomock.Any(), &adminservice.DescribeMutableStateRequest{
+		Namespace: mockedNamespace,
+		Execution: &execution1,
+	}).Return(nil, serviceerror.NewNotFound("")).AnyTimes()
+
+	// Set checkpoint to defaultNoProgressNotRetryableTimeout before current time
+	env.SetHeartbeatDetails(&replicationTasksHeartbeatDetails{
+		Results:    make([]VerifyResult, len(request.Executions)),
+		CheckPoint: time.Now().Add(-defaultNoProgressNotRetryableTimeout),
+	})
+
+	_, err := env.ExecuteActivity(s.a.GenerateAndVerifyReplicationTasks, &request)
+	s.Error(err)
+	s.ErrorContains(err, "verifyReplicationTasks was not able to make progress")
+
+	s.Greater(len(iceptor.replicationRecordedHeartbeats), 0)
+	lastHeartBeat := iceptor.replicationRecordedHeartbeats[len(iceptor.replicationRecordedHeartbeats)-1]
+	s.Equal(len(request.Executions), len(lastHeartBeat.Results))
+	for _, r := range lastHeartBeat.Results {
+		s.True(r.isCreatedToBeVerified())
 	}
 }
