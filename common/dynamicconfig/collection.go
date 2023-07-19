@@ -464,7 +464,7 @@ func matchAndConvert[T any](
 	val, matchErr := findMatch(cvs, defaultCVs, precedence)
 	if matchErr != nil {
 		if c.throttleLog() {
-			// c.logger.Debug("No such key in dynamic config, using default", tag.Key(key.String()), tag.Error(matchErr))
+			c.logger.Debug("No such key in dynamic config, using default", tag.Key(key.String()), tag.Error(matchErr))
 		}
 		// couldn't find a constrained match, use default
 		val = defaultValue

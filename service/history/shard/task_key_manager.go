@@ -29,7 +29,7 @@ import (
 
 	"go.temporal.io/server/common/clock"
 	"go.temporal.io/server/common/log"
-	"go.temporal.io/server/common/log/tag"
+	"go.temporal.io/server/common/persistence"
 	"go.temporal.io/server/service/history/configs"
 	"go.temporal.io/server/service/history/tasks"
 )
@@ -123,15 +123,9 @@ func (m *taskKeyManager) getExclusiveReaderHighWatermark(
 	)
 	if category.Type() == tasks.CategoryTypeScheduled {
 		exclusiveReaderHighWatermark.TaskID = 0
+		exclusiveReaderHighWatermark.FireTime = exclusiveReaderHighWatermark.FireTime.
+			Truncate(persistence.ScheduledTaskMinPrecision)
 	}
-
-	m.logger.Debug("ExclusiveReaderHighWatermark",
-		tag.NewStringTag("task-category", category.Name()),
-		tag.TaskID(exclusiveReaderHighWatermark.TaskID),
-		tag.TaskVisibilityTimestamp(exclusiveReaderHighWatermark.FireTime),
-		tag.NewInt64("min-task-id", minTaskKey.TaskID),
-		tag.NewTimeTag("min-task-visibility-timestamp", minTaskKey.FireTime),
-	)
 
 	return exclusiveReaderHighWatermark
 }

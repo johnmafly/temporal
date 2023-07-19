@@ -63,7 +63,7 @@ func NewTestLogger() *zapLogger {
 	}
 
 	logger := BuildZapLogger(Config{
-		Level:       "debug", //os.Getenv(testLogLevelEnvVar),
+		Level:       os.Getenv(testLogLevelEnvVar),
 		Format:      format,
 		Development: true,
 	})

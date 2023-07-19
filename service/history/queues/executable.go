@@ -168,7 +168,6 @@ func NewExecutable(
 }
 
 func (e *executableImpl) Execute() (retErr error) {
-	e.logger.Debug("Executing task")
 
 	startTime := e.timeSource.Now()
 	e.scheduleLatency = startTime.Sub(e.scheduledTime)

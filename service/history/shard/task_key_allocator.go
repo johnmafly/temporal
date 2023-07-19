@@ -76,7 +76,7 @@ func (a *taskKeyAllocator) allocate(
 	taskMaps ...map[tasks.Category][]tasks.Task,
 ) error {
 	now := a.timeSource.Now()
-	a.taskMinScheduledTime = util.MaxTime(a.taskMinScheduledTime, now)
+	a.setTaskMinScheduledTime(now)
 
 	for _, taskMap := range taskMaps {
 		for category, tasksByCategory := range taskMap {
@@ -86,40 +86,36 @@ func (a *taskKeyAllocator) allocate(
 				if err != nil {
 					return err
 				}
-
-				a.logger.Debug("Assigning task ID",
-					tag.TaskID(id),
-					tag.TaskType(task.GetType()),
-					tag.WorkflowID(task.GetWorkflowID()),
-					tag.WorkflowRunID(task.GetRunID()),
-				)
 				task.SetTaskID(id)
 
-				if !isScheduledTask {
-					task.SetVisibilityTime(now)
-					continue
-				}
-
 				taskScheduleTime := task.GetVisibilityTime()
-				if taskScheduleTime.Truncate(persistence.ScheduledTaskMinPrecision).Before(a.taskMinScheduledTime) {
-					// a.logger.Debug("New timer generated is less than read level",
-					// 	tag.WorkflowNamespaceID(task.GetNamespaceID()),
-					// 	tag.WorkflowID(task.GetWorkflowID()),
-					// 	tag.WorkflowRunID(task.GetRunID()),
-					// 	tag.Timestamp(taskScheduleTime),
-					// 	tag.CursorTimestamp(a.taskMinScheduledTime),
-					// 	tag.ValueShardAllocateTimerBeforeRead,
-					// )
-					task.SetVisibilityTime(a.taskMinScheduledTime.Add(persistence.ScheduledTaskMinPrecision))
+				if !isScheduledTask {
+					taskScheduleTime = now
 				}
-				a.logger.Debug("Assigning new timer",
-					tag.CursorTimestamp(time.Now().Add(time.Nanosecond)),
-					tag.Timestamp(task.GetVisibilityTime()),
-					tag.TaskID(task.GetTaskID()),
-					tag.MaxQueryLevel(a.taskMinScheduledTime),
-					tag.TaskType(task.GetType()),
+				taskScheduleTime = taskScheduleTime.
+					Add(persistence.ScheduledTaskMinPrecision).
+					Truncate(persistence.ScheduledTaskMinPrecision)
+				if isScheduledTask && taskScheduleTime.Before(a.taskMinScheduledTime) {
+					a.logger.Debug("New timer generated is less than min scheduled time",
+						tag.WorkflowNamespaceID(task.GetNamespaceID()),
+						tag.WorkflowID(task.GetWorkflowID()),
+						tag.WorkflowRunID(task.GetRunID()),
+						tag.Timestamp(taskScheduleTime),
+						tag.CursorTimestamp(a.taskMinScheduledTime),
+						tag.ValueShardAllocateTimerBeforeRead,
+					)
+					taskScheduleTime = a.taskMinScheduledTime.Add(persistence.ScheduledTaskMinPrecision)
+				}
+				task.SetVisibilityTime(taskScheduleTime)
+
+				a.logger.Debug("Assigning new task key",
+					tag.WorkflowNamespaceID(task.GetNamespaceID()),
 					tag.WorkflowID(task.GetWorkflowID()),
 					tag.WorkflowRunID(task.GetRunID()),
+					tag.TaskType(task.GetType()),
+					tag.TaskID(id),
+					tag.Timestamp(task.GetVisibilityTime()),
+					tag.CursorTimestamp(a.taskMinScheduledTime),
 				)
 			}
 		}
@@ -140,9 +136,7 @@ func (a *taskKeyAllocator) peekNextTaskKey(
 		// Once we validate the rest of the code can worker correctly with higher precision, the truncation should be removed.
 
 		a.setTaskMinScheduledTime(
-			a.timeSource.Now().
-				Add(a.taskScheduledTimeShift()).
-				Truncate(persistence.ScheduledTaskMinPrecision),
+			a.timeSource.Now().Add(a.taskScheduledTimeShift()),
 		)
 		return tasks.NewKey(a.taskMinScheduledTime, a.nextTaskID)
 	default:
@@ -183,7 +177,7 @@ func (a *taskKeyAllocator) setTaskMinScheduledTime(
 ) {
 	a.taskMinScheduledTime = util.MaxTime(
 		a.taskMinScheduledTime,
-		taskMinScheduledTime,
+		taskMinScheduledTime.Truncate(persistence.ScheduledTaskMinPrecision),
 	)
 }
 
