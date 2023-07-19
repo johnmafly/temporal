@@ -47,6 +47,7 @@ import (
 	"go.temporal.io/server/common/payloads"
 	"go.temporal.io/server/common/primitives/timestamp"
 	"go.temporal.io/server/common/rpc"
+	"go.temporal.io/server/service/history/consts"
 )
 
 func (s *integrationSuite) TestSignalWorkflow() {
@@ -841,8 +842,7 @@ func (s *integrationSuite) TestSignalWorkflow_WorkflowCloseAttempted() {
 		}
 
 		if attemptCount == 2 {
-			ctx, _ := rpc.NewContextWithTimeoutAndVersionHeaders(time.Second)
-			_, err := s.engine.SignalWorkflowExecution(ctx, &workflowservice.SignalWorkflowExecutionRequest{
+			_, err := s.engine.SignalWorkflowExecution(NewContext(), &workflowservice.SignalWorkflowExecutionRequest{
 				Namespace: s.namespace,
 				WorkflowExecution: &commonpb.WorkflowExecution{
 					WorkflowId: id,
@@ -853,7 +853,7 @@ func (s *integrationSuite) TestSignalWorkflow_WorkflowCloseAttempted() {
 				RequestId:  uuid.New(),
 			})
 			s.Error(err)
-			s.IsType(&serviceerror.Unavailable{}, err)
+			s.Error(consts.ErrWorkflowClosing, err)
 		}
 
 		attemptCount++
