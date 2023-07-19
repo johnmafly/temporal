@@ -332,3 +332,32 @@ func (s *activitiesSuite) TestGenerateAndVerifyReplicationTasks_Failed() {
 		s.True(r.isCreatedToBeVerified())
 	}
 }
+
+func (s *activitiesSuite) TestGenerateAndVerifyReplicationTasks_Skipped2() {
+	env, iceptor := s.initEnv()
+	request := genearteAndVerifyReplicationTasksRequest{
+		Namespace:             mockedNamespace,
+		NamespaceID:           mockedNamespaceID,
+		RPS:                   10,
+		TargetClusterEndpoint: remoteRpcAddress,
+		Executions:            []commonpb.WorkflowExecution{execution1},
+	}
+
+	// Set checkpoint to defaultNoProgressNotRetryableTimeout before current time
+	env.SetHeartbeatDetails(&replicationTasksHeartbeatDetails{
+		Results: []VerifyResult{
+			{Status: VERIFIED},
+		},
+		CheckPoint: time.Now(),
+	})
+
+	_, err := env.ExecuteActivity(s.a.GenerateAndVerifyReplicationTasks, &request)
+	s.NoError(err)
+
+	s.Greater(len(iceptor.replicationRecordedHeartbeats), 0)
+	lastHeartBeat := iceptor.replicationRecordedHeartbeats[len(iceptor.replicationRecordedHeartbeats)-1]
+	s.Equal(len(request.Executions), len(lastHeartBeat.Results))
+	for _, r := range lastHeartBeat.Results {
+		s.True(r.isVerified())
+	}
+}
