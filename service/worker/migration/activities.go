@@ -621,9 +621,9 @@ func (a *activities) verifyReplicationTasks(
 
 		case *serviceerror.NotFound:
 			a.forceReplicationMetricsHandler.WithTags(metrics.NamespaceTag(request.Namespace)).Counter(metrics.VerifyReplicationTaskNotFound.GetMetricName()).Record(1)
-			if err := a.verifyHandleNotFoundWorkflow(ctx, request.NamespaceID, &we, r); err != nil {
-				return false, progress, err
-			}
+			// if err := a.verifyHandleNotFoundWorkflow(ctx, request.NamespaceID, &we, r); err != nil {
+			// 	return false, progress, err
+			// }
 
 			if r.isNotVerified() {
 				detail.LastNotFoundWorkflowExecution = we
