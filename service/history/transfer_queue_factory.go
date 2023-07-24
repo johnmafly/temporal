@@ -42,7 +42,6 @@ import (
 	"go.temporal.io/server/service/history/shard"
 	"go.temporal.io/server/service/history/tasks"
 	wcache "go.temporal.io/server/service/history/workflow/cache"
-	"go.temporal.io/server/service/worker/archiver"
 )
 
 const (
@@ -56,7 +55,6 @@ type (
 		QueueFactoryBaseParams
 
 		ClientBean        client.Bean
-		ArchivalClient    archiver.Client
 		SdkClientFactory  sdk.ClientFactory
 		MatchingClient    resource.MatchingClient
 		HistoryClient     historyservice.HistoryServiceClient
@@ -122,7 +120,6 @@ func (f *transferQueueFactory) CreateQueue(
 	activeExecutor := newTransferQueueActiveTaskExecutor(
 		shard,
 		workflowCache,
-		f.ArchivalClient,
 		f.SdkClientFactory,
 		logger,
 		f.MetricsHandler,
@@ -134,7 +131,6 @@ func (f *transferQueueFactory) CreateQueue(
 	standbyExecutor := newTransferQueueStandbyTaskExecutor(
 		shard,
 		workflowCache,
-		f.ArchivalClient,
 		xdc.NewNDCHistoryResender(
 			f.NamespaceRegistry,
 			f.ClientBean,

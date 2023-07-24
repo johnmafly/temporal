@@ -552,7 +552,7 @@ func (s *TaskSerializer) transferCloseTaskToProto(
 		DeleteAfterClose:        closeTask.DeleteAfterClose,
 		TaskDetails: &persistencespb.TransferTaskInfo_CloseExecutionTaskDetails_{
 			CloseExecutionTaskDetails: &persistencespb.TransferTaskInfo_CloseExecutionTaskDetails{
-				CanSkipVisibilityArchival: closeTask.CanSkipVisibilityArchival,
+				CanSkipVisibilityArchival: true,
 			},
 		},
 	}
@@ -561,22 +561,16 @@ func (s *TaskSerializer) transferCloseTaskToProto(
 func (s *TaskSerializer) transferCloseTaskFromProto(
 	closeTask *persistencespb.TransferTaskInfo,
 ) *tasks.CloseExecutionTask {
-	canSkipVisibilityArchival := false
-	closeExecutionTaskDetails := closeTask.GetCloseExecutionTaskDetails()
-	if closeExecutionTaskDetails != nil {
-		canSkipVisibilityArchival = closeExecutionTaskDetails.CanSkipVisibilityArchival
-	}
 	return &tasks.CloseExecutionTask{
 		WorkflowKey: definition.NewWorkflowKey(
 			closeTask.NamespaceId,
 			closeTask.WorkflowId,
 			closeTask.RunId,
 		),
-		VisibilityTimestamp:       *closeTask.VisibilityTime,
-		TaskID:                    closeTask.TaskId,
-		Version:                   closeTask.Version,
-		DeleteAfterClose:          closeTask.DeleteAfterClose,
-		CanSkipVisibilityArchival: canSkipVisibilityArchival,
+		VisibilityTimestamp: *closeTask.VisibilityTime,
+		TaskID:              closeTask.TaskId,
+		Version:             closeTask.Version,
+		DeleteAfterClose:    closeTask.DeleteAfterClose,
 		// Delete workflow task process stage is not persisted. It is only for in memory retries.
 		DeleteProcessStage: tasks.DeleteWorkflowExecutionStageNone,
 	}

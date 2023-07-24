@@ -157,9 +157,6 @@ func (s *taskSerializerSuite) TestTransferCloseTask() {
 		Version:             rand.Int63(),
 	}
 	s.assertEqualTasks(closeTask)
-
-	closeTask.CanSkipVisibilityArchival = true
-	s.assertEqualTasks(closeTask)
 }
 
 func (s *taskSerializerSuite) TestTransferResetTask() {

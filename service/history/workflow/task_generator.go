@@ -193,7 +193,7 @@ func (r *TaskGeneratorImpl) GenerateWorkflowCloseTasks(
 				Version:     currentVersion,
 			},
 		)
-		if r.archivalQueueEnabled() {
+		if r.archivalEnabled() {
 			retention, err := r.getRetention()
 			if err != nil {
 				return err
@@ -208,9 +208,6 @@ func (r *TaskGeneratorImpl) GenerateWorkflowCloseTasks(
 			// archiveTime is the time when the archival queue recognizes the ArchiveExecutionTask as ready-to-process
 			archiveTime := closeEvent.GetEventTime().Add(delay)
 
-			// This flag is only untrue for old server versions which were using the archival workflow instead of the
-			// archival queue.
-			closeExecutionTask.CanSkipVisibilityArchival = true
 			task := &tasks.ArchiveExecutionTask{
 				// TaskID is set by the shard
 				WorkflowKey:         r.mutableState.GetWorkflowKey(),
@@ -666,10 +663,9 @@ func (r *TaskGeneratorImpl) getTargetNamespaceID(
 	return namespace.ID(r.mutableState.GetExecutionInfo().NamespaceId), nil
 }
 
-// archivalQueueEnabled returns true if archival is enabled for either history or visibility, and the archival queue
-// itself is also enabled.
+// archivalEnabled returns true if archival is enabled for either history or visibility.
 // For both history and visibility, we check that archival is enabled for both the cluster and the namespace.
-func (r *TaskGeneratorImpl) archivalQueueEnabled() bool {
+func (r *TaskGeneratorImpl) archivalEnabled() bool {
 	namespaceEntry := r.mutableState.GetNamespaceEntry()
 	return r.archivalMetadata.GetHistoryConfig().ClusterConfiguredForArchival() &&
 		namespaceEntry.HistoryArchivalState().State == enumspb.ARCHIVAL_STATE_ENABLED ||

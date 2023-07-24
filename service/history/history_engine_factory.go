@@ -39,7 +39,6 @@ import (
 	"go.temporal.io/server/service/history/replication"
 	"go.temporal.io/server/service/history/shard"
 	wcache "go.temporal.io/server/service/history/workflow/cache"
-	"go.temporal.io/server/service/worker/archiver"
 )
 
 type (
@@ -53,7 +52,6 @@ type (
 		Config                          *configs.Config
 		RawMatchingClient               resource.MatchingRawClient
 		NewCacheFn                      wcache.NewCacheFn
-		ArchivalClient                  archiver.Client
 		EventSerializer                 serialization.Serializer
 		QueueFactories                  []QueueFactory `group:"queueFactory"`
 		ReplicationTaskFetcherFactory   replication.TaskFetcherFactory
@@ -72,22 +70,5 @@ func (f *historyEngineFactory) CreateEngine(
 ) shard.Engine {
 	workflowCache := f.NewCacheFn(shard)
 	workflowConsistencyChecker := api.NewWorkflowConsistencyChecker(shard, workflowCache)
-	return NewEngineWithShardContext(
-		shard,
-		f.ClientBean,
-		f.MatchingClient,
-		f.SdkClientFactory,
-		f.EventNotifier,
-		f.Config,
-		f.RawMatchingClient,
-		workflowCache,
-		f.ArchivalClient,
-		f.EventSerializer,
-		f.QueueFactories,
-		f.ReplicationTaskFetcherFactory,
-		f.ReplicationTaskExecutorProvider,
-		workflowConsistencyChecker,
-		f.TracerProvider,
-		f.PersistenceVisibilityMgr,
-	)
+	return NewEngineWithShardContext(shard, f.ClientBean, f.MatchingClient, f.SdkClientFactory, f.EventNotifier, f.Config, f.RawMatchingClient, workflowCache, f.EventSerializer, f.QueueFactories, f.ReplicationTaskFetcherFactory, f.ReplicationTaskExecutorProvider, workflowConsistencyChecker, f.TracerProvider, f.PersistenceVisibilityMgr)
 }

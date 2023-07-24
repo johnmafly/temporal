@@ -89,7 +89,6 @@ import (
 	"go.temporal.io/server/service/history/shard"
 	"go.temporal.io/server/service/history/tasks"
 	wcache "go.temporal.io/server/service/history/workflow/cache"
-	"go.temporal.io/server/service/worker/archiver"
 )
 
 const (
@@ -133,24 +132,7 @@ type (
 )
 
 // NewEngineWithShardContext creates an instance of history engine
-func NewEngineWithShardContext(
-	shard shard.Context,
-	clientBean client.Bean,
-	matchingClient matchingservice.MatchingServiceClient,
-	sdkClientFactory sdk.ClientFactory,
-	eventNotifier events.Notifier,
-	config *configs.Config,
-	rawMatchingClient matchingservice.MatchingServiceClient,
-	workflowCache wcache.Cache,
-	archivalClient archiver.Client,
-	eventSerializer serialization.Serializer,
-	queueProcessorFactories []QueueFactory,
-	replicationTaskFetcherFactory replication.TaskFetcherFactory,
-	replicationTaskExecutorProvider replication.TaskExecutorProvider,
-	workflowConsistencyChecker api.WorkflowConsistencyChecker,
-	tracerProvider trace.TracerProvider,
-	persistenceVisibilityMgr manager.VisibilityManager,
-) shard.Engine {
+func NewEngineWithShardContext(shard shard.Context, clientBean client.Bean, matchingClient matchingservice.MatchingServiceClient, sdkClientFactory sdk.ClientFactory, eventNotifier events.Notifier, config *configs.Config, rawMatchingClient matchingservice.MatchingServiceClient, workflowCache wcache.Cache, eventSerializer serialization.Serializer, queueProcessorFactories []QueueFactory, replicationTaskFetcherFactory replication.TaskFetcherFactory, replicationTaskExecutorProvider replication.TaskExecutorProvider, workflowConsistencyChecker api.WorkflowConsistencyChecker, tracerProvider trace.TracerProvider, persistenceVisibilityMgr manager.VisibilityManager) shard.Engine {
 	currentClusterName := shard.GetClusterMetadata().GetCurrentClusterName()
 
 	logger := shard.GetLogger()
@@ -160,7 +142,6 @@ func NewEngineWithShardContext(
 		shard,
 		workflowCache,
 		config,
-		archivalClient,
 		shard.GetTimeSource(),
 		persistenceVisibilityMgr,
 	)
