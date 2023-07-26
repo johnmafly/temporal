@@ -116,3 +116,5 @@ require (
 	google.golang.org/protobuf v1.27.1 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 )
+
+replace google.golang.org/grpc => ./contrib/google.golang.org/grpc

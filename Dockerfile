@@ -11,6 +11,7 @@ WORKDIR /temporal
 
 # Copy go.mod/go.sum first to build docker layer with go dependencies (to improve rebuild time).
 COPY go.mod go.sum ./
+COPY contrib contrib
 RUN go mod download
 COPY . .
 RUN make bins

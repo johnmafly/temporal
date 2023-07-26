@@ -4,3 +4,7 @@
 [submodule "develop/docker-compose/grafana/provisioning/temporalio-dashboards"]
 	path = develop/docker-compose/grafana/provisioning/temporalio-dashboards
 	url = https://github.com/temporalio/dashboards
+[submodule "contrib/grpc"]
+        path = contrib/grpc
+        url = https://github.com/johnmafly/grpc-go.git
+        branch = v1.41.0-relax-server-limit
